@@ -4,7 +4,6 @@
 // blank-import line here.
 package genall
 
-// Generator packages are added here as they land:
-//   _ "bitbrush/internal/attractor"
-//   _ "bitbrush/internal/harmonograph"
-//   ...
+import (
+	_ "bitbrush/internal/truchet"
+)

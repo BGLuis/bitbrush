@@ -21,6 +21,25 @@ export interface GeneratorUI {
 }
 
 export const generators: GeneratorUI[] = [
-  // Phase 3 generators append their descriptors here:
-  //   attractor, harmonograph, truchet, contours, flowfield, lsystem, flame
+  {
+    name: "truchet",
+    title: "Ladrilhos de Truchet",
+    defaultSize: { width: 1024, height: 1024 },
+    controls: [
+      { key: "seed", label: "Semente", type: "seed", default: 0 },
+      { key: "tiles", label: "Ladrilhos na largura", type: "range", min: 2, max: 64, step: 1, default: 12 },
+      {
+        key: "style",
+        label: "Estilo",
+        type: "select",
+        options: ["arcs", "lines", "maze", "triangles"],
+        default: "arcs",
+      },
+      { key: "lineWidth", label: "Espessura do traço", type: "range", min: 0.03, max: 0.5, step: 0.01, default: 0.18 },
+      { key: "multiScale", label: "Multi-escala", type: "checkbox", default: false },
+      { key: "colorful", label: "Colorido", type: "checkbox", default: false },
+      { key: "background", label: "Fundo (hex)", type: "text", default: "#141414" },
+      { key: "ink", label: "Traço (hex)", type: "text", default: "#f2efe6" },
+    ],
+  },
 ];
