@@ -107,4 +107,24 @@ export const generators: GeneratorUI[] = [
       { key: "background", label: "Fundo (hex, opcional)", type: "text", default: "" },
     ],
   },
+  {
+    name: "flowfield",
+    title: "Campo de fluxo (tinta sumi)",
+    defaultSize: { width: 1280, height: 800 },
+    controls: [
+      { key: "seed", label: "Semente", type: "seed", default: 0 },
+      { key: "turbulence", label: "Turbulência", type: "range", min: 0.2, max: 8, step: 0.1, default: 2.4 },
+      { key: "density", label: "Densidade de traços", type: "range", min: 0.15, max: 4, step: 0.05, default: 1 },
+      { key: "curl", label: "Campo curl (sem divergência)", type: "checkbox", default: false },
+      {
+        key: "palette",
+        label: "Paleta",
+        type: "select",
+        options: ["ink", "indigo", "vermilion"],
+        default: "ink",
+      },
+      { key: "grain", label: "Grão do papel", type: "range", min: 0, max: 1, step: 0.05, default: 0.4 },
+      { key: "background", label: "Papel (hex, opcional)", type: "text", default: "" },
+    ],
+  },
 ];
