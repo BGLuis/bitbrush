@@ -1,0 +1,253 @@
+/* BitBrush — "Estúdio" shell theme.
+ *
+ * Tokens live here; every Svelte component styles itself with these vars via
+ * scoped <style>. This file also restyles the class names the hand-built
+ * imperative panels (gif.ts, generators-panel.ts, palette-panel.ts) still
+ * emit, so those wrapped panels match the dark shell until they're migrated.
+ *
+ * Type: system stack for now — the design calls for Space Grotesk + Hanken
+ * Grotesk + IBM Plex Mono. Drop self-hosted woff2 under public/fonts/ and add
+ * @font-face here when we want the identity faces (no runtime font CDN — the
+ * project caps external deps on purpose). */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #16141a;
+  --s1: #1c1a22;
+  --s2: #232029;
+  --s3: #2b2833;
+  --line: #322f3b;
+  --line-soft: #282530;
+
+  --text: #ece9f2;
+  --dim: #a49cb4;
+  --mute: #736d81;
+
+  --accent: #9b6dff;
+  --accent-press: #8552f0;
+  --tint: rgba(155, 109, 255, 0.14);
+
+  --radius: 8px;
+  --radius-sm: 6px;
+
+  --font: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --disp: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+}
+
+a {
+  color: #bfa3ff;
+}
+a:hover {
+  color: #d6c4ff;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* Native form controls tuned to the dark shell (they show up inside the
+ * wrapped panels and the descriptor-driven ParamControls alike). */
+input,
+select,
+textarea,
+button {
+  color: var(--text);
+}
+
+input[type="text"],
+input[type="number"],
+select,
+textarea {
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 6px 9px;
+  font: inherit;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+  width: 100%;
+}
+
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+input[type="color"] {
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  width: 2.4rem;
+  height: 2rem;
+  padding: 2px;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Legacy imperative-panel classes (still emitted by the wrapped     *
+ *  gif / generators / palette panels). Keep names, restyle dark.     *
+ * ------------------------------------------------------------------ */
+
+.control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.control {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr auto;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.control-label {
+  font-size: 0.82rem;
+  color: var(--dim);
+}
+
+.control-value {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  min-width: 3ch;
+  text-align: right;
+  color: var(--text);
+}
+
+.control-dice {
+  cursor: pointer;
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.2rem 0.45rem;
+}
+
+.widget-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.gif-panel,
+.gen-panel,
+.pal-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.9rem;
+  background: var(--s1);
+}
+
+.gif-panel summary,
+.gen-panel summary,
+.pal-panel summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.gif-panel .control-panel,
+.gen-panel .control-panel,
+.pal-panel .control-panel {
+  margin-top: 0.7rem;
+}
+
+.gif-panel button,
+.gen-panel button,
+.pal-panel button {
+  background: var(--s2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.7rem;
+  margin-right: 0.4rem;
+  cursor: pointer;
+}
+
+.gif-generate {
+  font-weight: 600;
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff;
+}
+
+.gif-status {
+  margin: 0.4rem 0 0;
+  font-size: 0.76rem;
+  color: var(--mute);
+  font-variant-numeric: tabular-nums;
+}
+
+.stop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.stop-list input[type="number"] {
+  width: 4.5rem;
+}
+
+.stop-remove {
+  padding: 0 0.4rem !important;
+}
+
+.css-out {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  resize: vertical;
+  color: #cbd6c9;
+  background: #141218;
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.swatch {
+  display: inline-flex;
+  align-items: flex-end;
+  min-width: 4.2rem;
+  height: 2.8rem;
+  padding: 0.2rem 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 0.62rem;
+  font-family: var(--mono);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.swatch.copied {
+  outline: 2px solid var(--accent);
+}

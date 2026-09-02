@@ -1,0 +1,13 @@
+# Go / WASM build outputs
+/web/public/main.wasm
+/web/public/wasm_exec.js
+
+# Node / Vite
+/web/node_modules/
+/web/dist/
+
+# Editor / OS
+.DS_Store
+
+# Test tooling
+/.playwright-mcp/

@@ -1,0 +1,21 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Estúdio (Direção A)" },
+    { "id": "page-2", "name": "Exploração inicial" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Filtro — Glitch", "page": "page-1" },
+    { "file": "Gerador.dc.html", "x": 1600, "y": 0, "w": 1440, "h": 900, "title": "Gerador — Gradiente + CSS", "page": "page-1" },
+
+    { "file": "Terminal.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "B · Bancada", "page": "page-2" },
+    { "file": "Pipeline.dc.html", "x": 1600, "y": 0, "w": 1440, "h": 900, "title": "C · Pilha", "page": "page-2" },
+    { "file": "Retro.dc.html", "x": 3200, "y": 0, "w": 1440, "h": 900, "title": "D · 8-bit", "page": "page-2" }
+  ],
+  "annotations": [
+    { "id": "estudio-nota", "x": 0, "y": -190, "w": 560, "page": "page-1", "text": "DIREÇÃO A · Estúdio — alta fidelidade\nShell de 3 zonas: trilho de ferramentas (filtros + geradores) · palco com canvas sobre lightbox e transporte de GIF · inspetor de parâmetros com abas Paleta / CSS / Histórico.\nA \"receita\" reproduzível fica fixa no topo e na barra de status (URL). Escuro warm-neutral, um único acento violeta, tipografia Space Grotesk + Hanken Grotesk + IBM Plex Mono.\nDois estados mostrados: um filtro (Glitch, 6 parâmetros + semente) e um gerador (Gradiente + CSS). Campo de ruído e Paleta reutilizam o mesmo layout de gerador." },
+    { "id": "dir-b", "x": 0, "y": -210, "w": 430, "page": "page-2", "text": "DIREÇÃO B · Bancada\nBrutalista, monoespaçada. A receita reproduzível é o herói da tela.\nNão escolhida — mantida para referência." },
+    { "id": "dir-c", "x": 1600, "y": -210, "w": 430, "page": "page-2", "text": "DIREÇÃO C · Pilha\nPilha de operações empilháveis com preview cumulativo.\nNão escolhida — ideia a revisitar depois do v1." },
+    { "id": "dir-d", "x": 3200, "y": -210, "w": 430, "page": "page-2", "text": "DIREÇÃO D · 8-bit\nEstética retrô de fósforo verde, moldura CRT.\nNão escolhida — mantida para referência." }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

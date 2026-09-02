@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..48,500;12..48,600;12..48,700&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0}
+    a{color:#5fd6c6}a:hover{color:#8fe6da}
+    .root{width:1440px;height:900px;overflow:hidden;background:#14181c;color:#e7edf1;
+      font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:14px;display:grid;grid-template-rows:58px 1fr}
+    .disp{font-family:'Bricolage Grotesque',system-ui,sans-serif}
+    .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+
+    .top{display:flex;align-items:center;gap:14px;padding:0 22px;background:#171c21;border-bottom:1px solid #262f37}
+    .brand{font-family:'Bricolage Grotesque';font-weight:700;font-size:17px;display:flex;align-items:center;gap:9px}
+    .brand i{width:16px;height:16px;border-radius:5px;background:#42c2b3;display:block}
+    .top .btn{padding:8px 14px;border-radius:8px;border:1px solid #2f3a43;background:#1e252b;color:#e7edf1;font-size:13px;font-weight:500}
+    .top .btn.add{background:#42c2b3;border-color:#42c2b3;color:#0c1114;font-weight:600}
+    .top .sp{margin-left:auto}
+
+    .body{display:grid;grid-template-columns:388px 1fr;min-height:0}
+    .stack{border-right:1px solid #262f37;padding:20px 18px;display:flex;flex-direction:column;gap:12px;background:#161b20;overflow:hidden}
+    .stack h4{margin:2px 2px 4px;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#7d8b96;font-weight:600}
+    .node{border:1px solid #2b333c;border-radius:11px;background:#1c2228;overflow:hidden}
+    .node .bar{display:flex;align-items:center;gap:10px;padding:12px 13px}
+    .node .grip{color:#5c6873;letter-spacing:1px}
+    .node .nm{font-weight:600}
+    .node .tag{margin-left:auto;font-size:12px;color:#8a97a2}
+    .node .tgl{width:34px;height:19px;border-radius:11px;background:#33404a;position:relative}
+    .node .tgl i{position:absolute;width:15px;height:15px;border-radius:50%;background:#e7edf1;top:2px;left:2px}
+    .node.on .tgl{background:#42c2b3}
+    .node.on .tgl i{left:17px}
+    .node .body{border-top:1px solid #2b333c;padding:13px;display:flex;flex-direction:column;gap:12px}
+    .node.active{border-color:#e0a458;box-shadow:0 0 0 1px #e0a458}
+    .node.off{opacity:.5}
+    .src{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1px dashed #2f3a43;border-radius:11px;color:#9aa6b0}
+    .src .thumb{width:44px;height:34px;border-radius:6px;background:radial-gradient(circle at 30% 30%,#ffb178,transparent),linear-gradient(120deg,#2a1c3d,#123)}
+    .ghost{border:1px dashed #2f3a43;border-radius:11px;padding:14px;text-align:center;color:#7d8b96}
+
+    .ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:#9aa6b0;margin-bottom:7px}
+    .ctl .v{color:#fff}
+    .trk{height:5px;border-radius:3px;background:#2b333c;position:relative}
+    .trk i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:#42c2b3}
+    .trk i::after{content:"";position:absolute;right:-6px;top:50%;transform:translateY(-50%);width:13px;height:13px;border-radius:50%;background:#fff}
+    .segs{display:flex;gap:6px}
+    .segs span{flex:1;text-align:center;padding:5px 0;border:1px solid #2f3a43;border-radius:6px;font-size:11.5px;color:#9aa6b0}
+    .segs span.on{background:#20313a;border-color:#3d6a63;color:#bff0e8}
+
+    .view{padding:24px 28px;display:flex;flex-direction:column;gap:16px;min-width:0}
+    .crumb{display:flex;align-items:center;gap:9px;color:#8a97a2;font-size:12.5px}
+    .crumb b{color:#e7edf1;font-weight:600}
+    .crumb .a{color:#e0a458}
+    .canvas{flex:1;border-radius:14px;border:1px solid #262f37;background:#10151a;display:flex;align-items:center;justify-content:center;min-height:0;position:relative;overflow:hidden}
+    .pic{width:600px;height:400px;border-radius:8px;position:relative;
+      background:
+        radial-gradient(circle at 28% 26%,#ffb178,transparent 46%),
+        radial-gradient(circle at 74% 64%,#6f9bff,transparent 52%),
+        linear-gradient(135deg,#2a1c3d,#132033);
+      box-shadow:0 16px 44px rgba(0,0,0,.5)}
+    .pic::after{content:"";position:absolute;inset:0;
+      background:repeating-linear-gradient(90deg,rgba(8,10,14,.5) 0 1px,transparent 1px 40px),
+        repeating-linear-gradient(0deg,rgba(8,10,14,.5) 0 1px,transparent 1px 40px);
+      mix-blend-mode:normal}
+    .result{display:flex;align-items:center;gap:14px}
+    .result .sw{display:flex;gap:5px}
+    .result .sw span{width:34px;height:34px;border-radius:7px}
+    .result .btn{margin-left:auto;padding:8px 14px;border-radius:8px;border:1px solid #2f3a43;background:#1e252b;color:#e7edf1;font-size:12.5px}
+  </style>
+</helmet>
+<div class="root">
+  <div class="top">
+    <div class="brand"><i></i>BitBrush</div>
+    <button class="btn add">＋ Adicionar operação</button>
+    <span class="sp"></span>
+    <button class="btn">Compartilhar pilha</button>
+    <button class="btn">Exportar ▾</button>
+  </div>
+
+  <div class="body">
+    <div class="stack">
+      <h4>Pilha de operações</h4>
+      <div class="src"><span class="thumb"></span><div><div style="color:#e7edf1;font-weight:600">Imagem base</div><div class="mono" style="font-size:11.5px">1024 × 768 · praca.jpg</div></div></div>
+
+      <div class="node on active">
+        <div class="bar"><span class="grip">⠿</span><span class="nm">Pixelização</span><span class="tag mono">bloco 8</span><span class="tgl"><i></i></span></div>
+        <div class="body">
+          <div class="ctl"><label>Tamanho do bloco <span class="v mono">8&nbsp;px</span></label><div class="trk"><i style="width:16%"></i></div></div>
+          <div class="ctl"><label>Métrica de cor <span class="v mono">oklab</span></label><div class="segs"><span class="on">oklab</span><span>srgb</span></div></div>
+        </div>
+      </div>
+
+      <div class="node on">
+        <div class="bar"><span class="grip">⠿</span><span class="nm">Quantização</span><span class="tag mono">16 cores ▸</span><span class="tgl"><i></i></span></div>
+      </div>
+
+      <div class="node off">
+        <div class="bar"><span class="grip">⠿</span><span class="nm">Glitch / RGB</span><span class="tag mono">desligado ▸</span><span class="tgl"><i></i></span></div>
+      </div>
+
+      <div class="ghost">＋ arrastar um filtro aqui</div>
+    </div>
+
+    <div class="view">
+      <div class="crumb">Base <b>→</b> <b>Pixelização</b> <b>→</b> <b>Quantização</b> <span class="a">→ Glitch (off)</span></div>
+      <div class="canvas"><div class="pic"></div></div>
+      <div class="result">
+        <span class="mono" style="color:#8a97a2;font-size:12px">paleta do resultado</span>
+        <div class="sw"><span style="background:#241a34"></span><span style="background:#5a3f78"></span><span style="background:#b06a92"></span><span style="background:#ff9575"></span><span style="background:#ffce8f"></span></div>
+        <button class="btn">Copiar CSS</button>
+        <button class="btn">Exportar GIF</button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

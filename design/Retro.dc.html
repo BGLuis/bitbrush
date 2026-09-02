@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&family=Hanken+Grotesk:wght@400;500;600&display=swap">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0}
+    a{color:#ffb642}a:hover{color:#ffd08a}
+    .root{width:1440px;height:900px;overflow:hidden;background:#0b0e0a;color:#dff3d6;
+      font-family:'Hanken Grotesk',system-ui,sans-serif;font-size:14px;position:relative;
+      display:grid;grid-template-rows:64px 1fr 40px}
+    .root::after{content:"";position:absolute;inset:0;pointer-events:none;
+      background:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 1px,transparent 1px 3px)}
+    .px{font-family:'Silkscreen',monospace}
+    .vt{font-family:'VT323',monospace;font-size:19px;line-height:1}
+
+    .hd{display:flex;align-items:center;gap:16px;padding:0 24px;border-bottom:3px solid #2f7d3f;background:#0e120c}
+    .hd .logo{font-family:'Silkscreen';font-weight:700;font-size:20px;color:#7dff9b;letter-spacing:1px;display:flex;align-items:center;gap:10px}
+    .hd .logo b{width:18px;height:18px;background:#7dff9b;display:block;box-shadow:6px 0 0 -3px #39d353,0 6px 0 -3px #39d353}
+    .hd .cur{width:9px;height:18px;background:#7dff9b;display:inline-block;margin-left:2px}
+    .hd .acts{margin-left:auto;display:flex;gap:10px}
+    .hd .acts button{font-family:'Silkscreen';font-size:11px;padding:10px 14px;color:#0b0e0a;background:#7dff9b;
+      border:0;box-shadow:4px 4px 0 #2f7d3f}
+    .hd .acts button.amb{background:#ffb642;box-shadow:4px 4px 0 #a5701d}
+
+    .main{display:grid;grid-template-columns:250px 1fr 280px;min-height:0}
+    .panel{border:3px solid #2f7d3f;margin:16px;padding:14px;overflow:hidden}
+    .panel .ttl{font-family:'Silkscreen';font-size:11px;color:#39d353;margin-bottom:12px;letter-spacing:1px}
+    .menu a{display:block;padding:8px 10px;color:#dff3d6;text-decoration:none;font-family:'VT323';font-size:20px;line-height:1.15}
+    .menu a.on{background:#7dff9b;color:#0b0e0a;font-weight:700}
+    .menu .div{height:3px;background:#2f7d3f;margin:10px 0}
+
+    .stage{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px}
+    .crt{width:560px;height:410px;border:3px solid #2f7d3f;border-radius:26px/22px;padding:14px;
+      background:#060806;box-shadow:inset 0 0 60px rgba(125,255,155,.14)}
+    .crt .scr{width:100%;height:100%;border-radius:16px/14px;position:relative;overflow:hidden;
+      background:
+        radial-gradient(circle at 30% 28%,#ffb178,transparent 45%),
+        radial-gradient(circle at 72% 66%,#54ffa0,transparent 52%),
+        linear-gradient(135deg,#1a2b1f,#0c1a10)}
+    .crt .scr::after{content:"";position:absolute;inset:0;
+      background:radial-gradient(circle,#0b0e0a 1px,transparent 1.6px) 0 0/5px 5px;opacity:.55}
+    .console{font-family:'VT323';font-size:20px;color:#7dff9b}
+
+    .prow{margin:16px 0}
+    .prow .k{font-family:'Silkscreen';font-size:10px;color:#9ddca6;letter-spacing:1px;display:flex;justify-content:space-between;margin-bottom:7px}
+    .prow .k b{color:#7dff9b}
+    .blocks{display:flex;gap:3px}
+    .blocks i{flex:1;height:16px;background:#1c3a23}
+    .blocks i.f{background:#7dff9b}
+    .step{display:flex;align-items:center;gap:8px;margin-top:6px}
+    .step .b{font-family:'Silkscreen';font-size:11px;padding:5px 9px;background:#12160f;border:2px solid #2f7d3f;color:#7dff9b}
+    .step .box{font-family:'VT323';font-size:20px;border:2px solid #2f7d3f;padding:2px 12px;color:#dff3d6}
+    .sw{display:flex;gap:4px;margin-top:6px}
+    .sw span{width:40px;height:40px;border:2px solid #0b0e0a}
+
+    .ft{border-top:3px solid #2f7d3f;background:#0e120c;display:flex;align-items:center;gap:22px;padding:0 24px;
+      font-family:'Silkscreen';font-size:10px;color:#9ddca6;letter-spacing:1px}
+    .ft .amb{color:#ffb642;display:flex;align-items:center;gap:8px}
+    .ft .amb i{width:9px;height:9px;background:#ffb642;display:block}
+  </style>
+</helmet>
+<div class="root">
+  <div class="hd">
+    <div class="logo"><b></b>BITBRUSH<span class="cur"></span></div>
+    <div class="acts">
+      <button>LOAD</button>
+      <button>SHARE</button>
+      <button class="amb">SAVE</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="panel menu">
+      <div class="ttl">&gt;&gt; EFFECTS</div>
+      <a class="on" href="#">PIXELATE</a>
+      <a href="#">EDGES / SOBEL</a>
+      <a href="#">POSTER / QUANT</a>
+      <a href="#">DITHER (FS)</a>
+      <a href="#">GLITCH / RGB</a>
+      <a href="#">ASCII COLOR</a>
+      <div class="div"></div>
+      <a href="#">GRADIENT + CSS</a>
+      <a href="#">NOISEFIELD</a>
+      <a href="#">PALETTE</a>
+    </div>
+
+    <div class="stage">
+      <div class="crt"><div class="scr"></div></div>
+      <div class="console">&gt; rendered 512x512 in 34ms &nbsp;·&nbsp; seed 00000 &nbsp;·&nbsp; block 8_</div>
+    </div>
+
+    <div class="panel">
+      <div class="ttl">&gt;&gt; PARAMS</div>
+      <div class="prow">
+        <div class="k"><span>BLOCK SIZE</span><b>08</b></div>
+        <div class="blocks"><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="prow">
+        <div class="k"><span>COLORS</span><b>16</b></div>
+        <div class="blocks"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <div class="prow">
+        <div class="k"><span>SEED</span><b>&nbsp;</b></div>
+        <div class="step"><span class="b">−</span><span class="box">00000</span><span class="b">＋</span></div>
+      </div>
+      <div class="ttl" style="margin-top:22px">&gt;&gt; PALETTE</div>
+      <div class="sw"><span style="background:#1a2b1f"></span><span style="background:#3f7d5a"></span><span style="background:#7dff9b"></span><span style="background:#ffce8f"></span><span style="background:#ff9575"></span></div>
+    </div>
+  </div>
+
+  <div class="ft">
+    <span>ENGINE: AUTO</span>
+    <span>PREVIEW: 720</span>
+    <span>URL: ?e=pixelate&amp;block=8</span>
+    <span class="amb" style="margin-left:auto"><i></i>DETERMINISTIC</span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

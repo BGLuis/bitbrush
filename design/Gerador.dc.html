@@ -1,0 +1,204 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    :root{
+      --bg:#16141a; --s1:#1c1a22; --s2:#232029; --s3:#2b2833;
+      --line:#322f3b; --line-soft:#282530;
+      --text:#ece9f2; --dim:#a49cb4; --mute:#736d81;
+      --accent:#9b6dff; --tint:rgba(155,109,255,.14);
+      --font:'Hanken Grotesk',system-ui,sans-serif;
+      --disp:'Space Grotesk',system-ui,sans-serif;
+      --mono:'IBM Plex Mono',ui-monospace,monospace;
+    }
+    *{box-sizing:border-box}
+    body{margin:0}
+    a{color:#bfa3ff}a:hover{color:#d6c4ff}
+    .root{width:1440px;height:900px;overflow:hidden;background:var(--bg);color:var(--text);
+      font-family:var(--font);font-size:13px;line-height:1.45;display:grid;grid-template-rows:52px 1fr 30px}
+    .mono{font-family:var(--mono)}
+
+    .top{display:flex;align-items:center;gap:16px;padding:0 18px;background:var(--s1);border-bottom:1px solid var(--line)}
+    .brand{display:flex;align-items:center;gap:9px;font-family:var(--disp);font-weight:700;font-size:15.5px}
+    .brand .mk{width:16px;height:16px;border-radius:5px;background:linear-gradient(150deg,#b58cff,#7b52e0)}
+    .pill{display:flex;align-items:center;gap:9px;padding:6px 11px;border:1px solid var(--line);border-radius:8px;background:var(--s2);color:var(--dim);font-family:var(--mono);font-size:11.5px}
+    .pill b{color:var(--text);font-weight:500}
+    .top .right{margin-left:auto;display:flex;gap:8px}
+    .btn{display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:8px;border:1px solid #3a3646;background:var(--s2);color:var(--text);font-size:12.5px;font-weight:500}
+    .btn svg{width:14px;height:14px}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+
+    .body{display:grid;grid-template-columns:248px 1fr 320px;min-height:0}
+    .rail{background:var(--s1);border-right:1px solid var(--line);padding:14px 12px;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+    .rail h4{margin:6px 8px 7px;font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;color:var(--mute);font-weight:600}
+    .tool{display:flex;align-items:center;gap:11px;padding:8px 9px;border-radius:7px;color:var(--dim);font-weight:500}
+    .tool svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+    .tool.on{background:var(--tint);color:#fff;box-shadow:inset 2px 0 0 var(--accent)}
+    .sep{height:1px;background:var(--line-soft);margin:12px 8px}
+
+    .stage{display:flex;flex-direction:column;min-width:0}
+    .stage-hd{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid var(--line-soft)}
+    .stage-hd .t{font-family:var(--disp);font-weight:600;font-size:15px}
+    .stage-hd .d{color:var(--mute);font-size:12px}
+    .stage-hd .z{margin-left:auto;display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:7px;background:var(--s2);padding:5px 10px;color:var(--dim);font-size:11.5px}
+
+    .viewport{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;padding:26px;
+      background:conic-gradient(from 90deg at 50% 50%,#211e29 0 25%,#191720 0 50%,#211e29 0 75%,#191720 0) 0 0/22px 22px}
+    .grad{width:760px;height:430px;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5);
+      background:linear-gradient(90deg,#6c5ce7 0%,#b06a92 34%,#ff8f6d 66%,#ffc785 100%)}
+    .stops{position:absolute;left:0;right:0;bottom:44px;display:flex;justify-content:center}
+    .stops .rail2{width:760px;height:8px;border-radius:4px;background:linear-gradient(90deg,#6c5ce7,#b06a92,#ff8f6d,#ffc785);position:relative}
+    .stops .h{position:absolute;top:-6px;width:18px;height:18px;border-radius:50%;border:3px solid #fff;transform:translateX(-50%);box-shadow:0 2px 6px rgba(0,0,0,.5)}
+
+    .transport{display:flex;align-items:center;gap:10px;padding:12px 22px;border-top:1px solid var(--line-soft);color:var(--dim);font-size:12px}
+    .transport .lab{font-family:var(--disp);font-weight:600;color:var(--text);font-size:12px}
+    .chip{padding:6px 11px;border:1px solid var(--line);border-radius:7px;background:var(--s2);color:var(--dim);font-size:11.5px}
+    .chip.go{color:#fff;border-color:var(--accent);background:var(--accent)}
+
+    .insp{background:var(--s1);border-left:1px solid var(--line);padding:15px;overflow:hidden;display:flex;flex-direction:column}
+    .insp-hd h3{margin:0 0 4px;font-family:var(--disp);font-weight:600;font-size:13.5px}
+    .stop-list{display:flex;flex-direction:column;gap:7px;margin:10px 0 4px}
+    .stop{display:flex;align-items:center;gap:9px;font-family:var(--mono);font-size:11.5px;color:var(--dim)}
+    .stop .dot{width:20px;height:20px;border-radius:5px;border:1px solid var(--line)}
+    .stop .pos{margin-left:auto;padding:4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--s2);color:var(--text)}
+    .stop .x{color:var(--mute)}
+    .add{margin-top:4px;padding:7px;border:1px dashed var(--line);border-radius:7px;text-align:center;color:var(--mute);font-size:11.5px}
+
+    .ctl{margin:12px 0}
+    .ctl label{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:8px}
+    .ctl .val{color:var(--text);font-family:var(--mono);font-size:11.5px}
+    .track{height:5px;border-radius:3px;background:var(--s3);position:relative}
+    .track i{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent)}
+    .track i::after{content:"";position:absolute;right:-7px;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;background:#fff}
+    .field{width:100%;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--s2);font-family:var(--mono);font-size:11.5px;color:var(--text);display:flex;justify-content:space-between}
+    .field .c{color:var(--mute)}
+    .segs{display:flex;gap:6px}
+    .segs span{flex:1;text-align:center;padding:6px 0;border:1px solid var(--line);border-radius:6px;font-size:11px;color:var(--dim)}
+    .segs span.on{background:var(--tint);border-color:#5a4a86;color:#fff}
+
+    .tabs{display:flex;gap:16px;margin:16px 0 11px;border-bottom:1px solid var(--line-soft);padding-bottom:9px;font-size:12px;color:var(--mute)}
+    .tabs b{color:var(--text);font-weight:600;box-shadow:0 9px 0 -8px var(--accent);padding-bottom:9px}
+    .css{border:1px solid var(--line);border-radius:8px;background:#141218;padding:11px 12px;font-family:var(--mono);font-size:11px;line-height:1.7;color:#cbd6c9}
+    .css .k{color:#c99bff}.css .n{color:#ffc785}.css .s{color:#8fd6a0}
+    .css-actions{display:flex;gap:8px;margin-top:10px;font-size:11.5px;color:var(--dim)}
+    .css-actions .b{padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:var(--s2)}
+    .css-actions .b.on{background:var(--accent);border-color:var(--accent);color:#fff}
+
+    .status{display:flex;align-items:center;gap:16px;padding:0 18px;background:var(--s1);border-top:1px solid var(--line);font-family:var(--mono);font-size:10.5px;color:var(--mute)}
+    .status .k{color:var(--dim)}
+    .status .url{margin-left:auto;color:var(--dim)}
+    .status .url a{color:#bfa3ff}
+  </style>
+</helmet>
+<div class="root">
+
+  <div class="top">
+    <div class="brand"><span class="mk"></span>BitBrush</div>
+    <div class="pill mono">receita&nbsp; <b>gradient</b> · 4 paradas · 90° · in oklch · shorter hue</div>
+    <div class="right">
+      <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M8.2 10.8l7.6-3.6M8.2 13.2l7.6 3.6"/></svg>Compartilhar</button>
+      <button class="btn primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 3v12M8 11l4 4 4-4M4 21h16"/></svg>Exportar ▾</button>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <div class="rail">
+      <h4>Filtros</h4>
+      <div class="tool"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7"/><rect x="13.5" y="3.5" width="7" height="7"/><rect x="3.5" y="13.5" width="7" height="7"/><rect x="13.5" y="13.5" width="7" height="7"/></svg>Pixelização</div>
+      <div class="tool"><svg viewBox="0 0 24 24"><path d="M4 20 20 4M4 20V9M4 20h11"/></svg>Bordas (Sobel)</div>
+      <div class="tool"><svg viewBox="0 0 24 24"><path d="M4 19h4v-8H4zM10 19h4V6h-4zM16 19h4v-5h-4z"/></svg>Quantização</div>
+      <div class="tool"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="1.3"/><circle cx="12" cy="7" r="1.3"/><circle cx="18" cy="6" r="1.3"/><circle cx="7" cy="13" r="1.3"/><circle cx="14" cy="14" r="1.3"/><circle cx="9" cy="19" r="1.3"/></svg>Dithering</div>
+      <div class="tool"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="4"/><rect x="8" y="14" width="13" height="4"/></svg>Glitch / RGB Shift</div>
+      <div class="tool"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M9 16l3-8 3 8M10.2 13h3.6"/></svg>ASCII colorido</div>
+      <div class="sep"></div>
+      <h4>Geradores</h4>
+      <div class="tool on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none"/></svg>Gradiente + CSS</div>
+      <div class="tool"><svg viewBox="0 0 24 24"><path d="M3 15c3-7 6 7 9 0s6-7 9 0"/><path d="M3 9c3-7 6 7 9 0s6-7 9 0" opacity=".45"/></svg>Campo de ruído</div>
+      <div class="tool"><svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="4.5" height="16"/><rect x="9.7" y="4" width="4.5" height="16"/><rect x="16" y="4" width="4.5" height="16"/></svg>Paleta</div>
+    </div>
+
+    <div class="stage">
+      <div class="stage-hd">
+        <span class="t">Gradiente + CSS</span>
+        <span class="d">Multi-stop, interpolação perceptual, easing entre paradas — emite CSS Color 4 nativo ou paradas fixas.</span>
+        <span class="z">760 × 430 · exportar PNG</span>
+      </div>
+      <div class="viewport">
+        <div class="grad"></div>
+        <div class="stops"><div class="rail2">
+          <span class="h" style="left:0%;background:#6c5ce7"></span>
+          <span class="h" style="left:34%;background:#b06a92"></span>
+          <span class="h" style="left:66%;background:#ff8f6d"></span>
+          <span class="h" style="left:100%;background:#ffc785"></span>
+        </div></div>
+      </div>
+      <div class="transport">
+        <span class="lab">Animar</span>
+        <span class="chip">Interpolar ângulo</span>
+        <span class="chip">Interpolar paradas</span>
+        <span style="flex:1;height:1px;background:var(--line-soft)"></span>
+        <span class="chip">24 quadros</span>
+        <span class="chip go">● Gerar GIF</span>
+      </div>
+    </div>
+
+    <div class="insp">
+      <div class="insp-hd"><h3>Paradas</h3></div>
+      <div class="stop-list">
+        <div class="stop"><span class="dot" style="background:#6c5ce7"></span>#6c5ce7 <span class="pos">0%</span><span class="x">✕</span></div>
+        <div class="stop"><span class="dot" style="background:#b06a92"></span>#b06a92 <span class="pos">34%</span><span class="x">✕</span></div>
+        <div class="stop"><span class="dot" style="background:#ff8f6d"></span>#ff8f6d <span class="pos">66%</span><span class="x">✕</span></div>
+        <div class="stop"><span class="dot" style="background:#ffc785"></span>#ffc785 <span class="pos">100%</span><span class="x">✕</span></div>
+      </div>
+      <div class="add">＋ adicionar parada</div>
+
+      <div class="ctl">
+        <label>Ângulo <span class="val">90°</span></label>
+        <div class="track"><i style="width:25%"></i></div>
+      </div>
+      <div class="ctl">
+        <label>Interpolação</label>
+        <div class="field">OKLCh <span class="c">sRGB · linear · HSL · Lab · LCh · OKLab</span></div>
+      </div>
+      <div class="ctl">
+        <label>Arco de matiz</label>
+        <div class="segs"><span class="on">shorter</span><span>longer</span><span>inc</span><span>dec</span></div>
+      </div>
+      <div class="ctl">
+        <label>Easing entre paradas</label>
+        <div class="field">ease-in-out <span class="c">cubic-bezier() · steps() · linear()</span></div>
+      </div>
+
+      <div class="tabs"><span>Paleta</span><b>CSS</b><span>Histórico</span></div>
+      <div class="css">
+<span class="k">background</span>: linear-gradient(<br>
+&nbsp;&nbsp;<span class="n">90deg</span> in oklch <span class="n">shorter hue</span>,<br>
+&nbsp;&nbsp;<span class="s">#6c5ce7</span> 0%, <span class="s">#b06a92</span> 34%,<br>
+&nbsp;&nbsp;<span class="s">#ff8f6d</span> 66%, <span class="s">#ffc785</span> 100%);
+      </div>
+      <div class="css-actions">
+        <span class="b on">nativo</span>
+        <span class="b">paradas fixas</span>
+        <span class="b" style="margin-left:auto">Copiar CSS</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="status">
+    <span><span class="k">Motor:</span> Automático → Worker (WASM)</span>
+    <span><span class="k">Preview:</span> 720 px</span>
+    <span><span class="k">Saída:</span> CSS nativo (in oklch)</span>
+    <span class="url">?g=gradient&amp;stops=6c5ce7,b06a92,ff8f6d,ffc785&amp;a=90&amp;space=oklch &nbsp; <a href="#">⧉ copiar link</a></span>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
