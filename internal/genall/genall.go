@@ -5,6 +5,7 @@
 package genall
 
 import (
+	_ "bitbrush/internal/attractor"
 	_ "bitbrush/internal/harmonograph"
 	_ "bitbrush/internal/truchet"
 )
