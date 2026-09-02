@@ -9,5 +9,6 @@ import (
 	_ "bitbrush/internal/contours"
 	_ "bitbrush/internal/flowfield"
 	_ "bitbrush/internal/harmonograph"
+	_ "bitbrush/internal/lsystem"
 	_ "bitbrush/internal/truchet"
 )
