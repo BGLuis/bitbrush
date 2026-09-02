@@ -84,4 +84,27 @@ export const generators: GeneratorUI[] = [
       { key: "ink", label: "Tinta (hex)", type: "text", default: "#efe7d8" },
     ],
   },
+  {
+    name: "contours",
+    title: "Curvas de nível (topográfico)",
+    defaultSize: { width: 1280, height: 800 },
+    controls: [
+      { key: "seed", label: "Semente", type: "seed", default: 1337 },
+      { key: "levels", label: "Níveis", type: "range", min: 4, max: 48, step: 1, default: 18 },
+      { key: "indexEvery", label: "Curva-mestra a cada", type: "range", min: 0, max: 12, step: 1, default: 5 },
+      { key: "scale", label: "Escala do ruído", type: "range", min: 0.2, max: 4, step: 0.05, default: 1 },
+      { key: "warp", label: "Distorção de domínio", type: "range", min: 0, max: 2, step: 0.05, default: 0.6 },
+      { key: "octaves", label: "Oitavas (fBm)", type: "range", min: 1, max: 8, step: 1, default: 5 },
+      { key: "time", label: "Tempo (anima)", type: "range", min: 0, max: 60, step: 0.1, default: 0 },
+      { key: "hillshade", label: "Relevo sombreado", type: "checkbox", default: true },
+      {
+        key: "palette",
+        label: "Paleta",
+        type: "select",
+        options: ["paper", "blueprint", "terrain"],
+        default: "paper",
+      },
+      { key: "background", label: "Fundo (hex, opcional)", type: "text", default: "" },
+    ],
+  },
 ];
