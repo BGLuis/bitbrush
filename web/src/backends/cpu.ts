@@ -11,6 +11,7 @@ import {
   renderGradient as wasmRenderGradient,
   gradientCSS as wasmGradientCSS,
   renderNoiseField as wasmRenderNoiseField,
+  renderGenerator as wasmRenderGenerator,
   extractPalette as wasmExtractPalette,
   genPalette as wasmGenPalette,
   type FilterParams,
@@ -19,6 +20,7 @@ import {
   type GradientParams,
   type GradientCSSOptions,
   type NoiseFieldParams,
+  type GeneratorParams,
   type PaletteExtractOptions,
   type PaletteHarmonyOptions,
 } from "../wasm";
@@ -58,6 +60,15 @@ class CpuBackend implements FilterBackend {
 
   async renderNoiseField(params: NoiseFieldParams, w: number, h: number): Promise<ImageData> {
     return wasmRenderNoiseField(params, w, h);
+  }
+
+  async renderGenerator(
+    name: string,
+    params: GeneratorParams,
+    w: number,
+    h: number,
+  ): Promise<ImageData> {
+    return wasmRenderGenerator(name, params, w, h);
   }
 
   async extractPalette(img: ImageData, options: PaletteExtractOptions): Promise<string[]> {

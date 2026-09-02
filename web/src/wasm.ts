@@ -41,6 +41,12 @@ declare global {
     w: number,
     h: number,
   ): { ok: boolean; data: Uint8Array | null; error: string };
+  function bitbrushRenderGenerator(
+    name: string,
+    paramsJSON: string,
+    w: number,
+    h: number,
+  ): { ok: boolean; data: Uint8Array | null; error: string };
   function bitbrushExtractPalette(
     rgba: Uint8Array,
     w: number,
@@ -218,6 +224,22 @@ export function gradientCSS(params: GradientParams, options: GradientCSSOptions)
 export function renderNoiseField(params: NoiseFieldParams, w: number, h: number): ImageData {
   const res = bitbrushRenderNoiseField(JSON.stringify(params), w, h);
   if (!res.ok || !res.data) throw new Error(res.error || "noise field render failed");
+  return new ImageData(new Uint8ClampedArray(res.data), w, h);
+}
+
+// A flat param bag for the algorithmic generators (internal/generators
+// registry) — attractors, harmonographs, Truchet tilings, and so on. Each
+// generator names its own keys; see web/src/ui/generators.ts.
+export type GeneratorParams = Record<string, number | string | boolean>;
+
+export function renderGenerator(
+  name: string,
+  params: GeneratorParams,
+  w: number,
+  h: number,
+): ImageData {
+  const res = bitbrushRenderGenerator(name, JSON.stringify(params), w, h);
+  if (!res.ok || !res.data) throw new Error(res.error || "generator render failed");
   return new ImageData(new Uint8ClampedArray(res.data), w, h);
 }
 

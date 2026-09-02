@@ -49,6 +49,13 @@ self.onmessage = async (e) => {
       self.postMessage({ id: req.id, ok: true, buf: out.buffer, width: req.width, height: req.height }, [out.buffer]);
       return;
     }
+    if (req.op === "generator") {
+      const r = bitbrushRenderGenerator(req.name, req.params, req.width, req.height);
+      if (!r.ok || !r.data) throw new Error(r.error || "generator render failed");
+      const out = r.data.slice();
+      self.postMessage({ id: req.id, ok: true, buf: out.buffer, width: req.width, height: req.height }, [out.buffer]);
+      return;
+    }
     if (req.op === "gradientCSS") {
       const r = bitbrushGradientCSS(req.params, req.options);
       if (!r.ok) throw new Error(r.error || "gradient css failed");

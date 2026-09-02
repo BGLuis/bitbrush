@@ -5,9 +5,14 @@ import (
 	"fmt"
 	"syscall/js"
 
+	"bitbrush/internal/generators"
 	"bitbrush/internal/gradient"
 	"bitbrush/internal/noisefield"
 	"bitbrush/internal/palette"
+
+	// Algorithmic generators self-register with internal/generators via
+	// their init(); blank-import each so it is linked into the WASM binary.
+	_ "bitbrush/internal/genall"
 )
 
 // This file registers the generator + palette globals. Same {ok,...,error}
@@ -17,6 +22,7 @@ func registerGenerators() {
 	js.Global().Set("bitbrushRenderGradient", js.FuncOf(renderGradient))
 	js.Global().Set("bitbrushGradientCSS", js.FuncOf(gradientCSS))
 	js.Global().Set("bitbrushRenderNoiseField", js.FuncOf(renderNoiseField))
+	js.Global().Set("bitbrushRenderGenerator", js.FuncOf(renderGenerator))
 	js.Global().Set("bitbrushExtractPalette", js.FuncOf(extractPalette))
 	js.Global().Set("bitbrushGenPalette", js.FuncOf(genPalette))
 }
@@ -186,6 +192,30 @@ func renderNoiseField(_ js.Value, args []js.Value) (result any) {
 		Seed:       p.Seed,
 		Time:       p.Time,
 	}, args[1].Int(), args[2].Int())
+	return okData(img.Pix)
+}
+
+// bitbrushRenderGenerator(name string, paramsJSON string, w int, h int) ->
+// {ok, data: Uint8Array|null, error}. Dispatches to the internal/generators
+// registry; paramsJSON is handed to the named generator untouched (each one
+// defines and unmarshals its own params struct). Enums cross as lower-case
+// name strings, same as the other generator globals.
+func renderGenerator(_ js.Value, args []js.Value) (result any) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = map[string]any{"ok": false, "data": js.Null(), "error": fmt.Sprintf("panic: %v", r)}
+		}
+	}()
+
+	name := args[0].String()
+	var raw json.RawMessage
+	if args[1].Type() == js.TypeString {
+		raw = json.RawMessage(args[1].String())
+	}
+	img, err := generators.Render(name, raw, args[2].Int(), args[3].Int())
+	if err != nil {
+		return errData(err)
+	}
 	return okData(img.Pix)
 }
 

@@ -12,6 +12,7 @@ import type {
   GradientParams,
   GradientCSSOptions,
   NoiseFieldParams,
+  GeneratorParams,
   PaletteExtractOptions,
   PaletteHarmonyOptions,
 } from "../wasm";
@@ -120,6 +121,22 @@ class WorkerBackend implements FilterBackend {
   async renderNoiseField(params: NoiseFieldParams, w: number, h: number): Promise<ImageData> {
     const r = await this.#send({
       op: "noisefield",
+      params: JSON.stringify(params),
+      width: w,
+      height: h,
+    });
+    return new ImageData(new Uint8ClampedArray(r.buf!), r.width!, r.height!);
+  }
+
+  async renderGenerator(
+    name: string,
+    params: GeneratorParams,
+    w: number,
+    h: number,
+  ): Promise<ImageData> {
+    const r = await this.#send({
+      op: "generator",
+      name,
       params: JSON.stringify(params),
       width: w,
       height: h,

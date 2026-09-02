@@ -16,6 +16,7 @@ import type {
   GradientParams,
   GradientCSSOptions,
   NoiseFieldParams,
+  GeneratorParams,
   PaletteExtractOptions,
   PaletteHarmonyOptions,
 } from "./wasm";
@@ -48,6 +49,8 @@ export interface FilterBackend {
   gradientCSS(params: GradientParams, options: GradientCSSOptions): Promise<string>;
   /** Render a generative noise-field gradient (internal/noisefield). */
   renderNoiseField(params: NoiseFieldParams, w: number, h: number): Promise<ImageData>;
+  /** Render a named algorithmic generator (internal/generators registry). */
+  renderGenerator(name: string, params: GeneratorParams, w: number, h: number): Promise<ImageData>;
   /** Extract a palette from an image (internal/palette). */
   extractPalette(img: ImageData, options: PaletteExtractOptions): Promise<string[]>;
   /** Generate a harmony palette from a base colour. */
