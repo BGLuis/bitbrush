@@ -4,6 +4,8 @@
   import { panel } from "./lib/panel";
   import { makeGifPanel } from "./lib/wrapped";
   import { openFilePicker } from "./lib/image";
+  import { generatorStore } from "./generator/generator-store.svelte";
+  import CanvasSpotsOverlay from "./generator/CanvasSpotsOverlay.svelte";
 
   let canvasEl: HTMLCanvasElement;
 
@@ -49,7 +51,19 @@
   </header>
 
   <div class="viewport">
-    <canvas bind:this={canvasEl} class:hidden={showEmpty}></canvas>
+    <div
+      class="canvas-frame"
+      class:generator-mode={ui.mode === "generator"}
+      class:hidden={showEmpty}
+      style={ui.mode === "generator"
+        ? `--ar: ${generatorStore.ratio}; --arn: ${generatorStore.aspectRatio};`
+        : ""}
+    >
+      <canvas bind:this={canvasEl}></canvas>
+      {#if ui.mode === "generator" && generatorStore.generatorMode === "noise" && generatorStore.isOrganic}
+        <CanvasSpotsOverlay />
+      {/if}
+    </div>
     {#if showEmpty}
       <div class="empty">
         <p>Carregue uma imagem para começar.</p>
@@ -106,15 +120,35 @@
         )
         0 0 / 22px 22px;
   }
+  .canvas-frame {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .canvas-frame.generator-mode {
+    aspect-ratio: var(--ar, 16/9);
+    width: min(100%, calc(68vh * var(--arn, 1.7778)));
+    max-height: 100%;
+  }
+  .canvas-frame.hidden {
+    display: none;
+  }
   canvas {
     max-width: 100%;
     max-height: 100%;
     border-radius: 5px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    display: block;
     image-rendering: pixelated;
   }
-  canvas.hidden {
-    display: none;
+  .canvas-frame.generator-mode canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: auto;
   }
   .empty {
     text-align: center;

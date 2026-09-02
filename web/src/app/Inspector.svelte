@@ -1,8 +1,9 @@
 <script lang="ts">
   import { ui, effectByName, resetParams } from "./store.svelte";
   import ParamControls from "./ParamControls.svelte";
+  import GeneratorPanel from "./generator/GeneratorPanel.svelte";
   import { panel } from "./lib/panel";
-  import { makeGeneratorPanel, makePalettePanel } from "./lib/wrapped";
+  import { makePalettePanel } from "./lib/wrapped";
 
   const title = $derived(
     ui.mode === "filter" ? (effectByName(ui.effectName)?.title ?? "Parâmetros") : "",
@@ -21,8 +22,8 @@
     </div>
     <ParamControls />
   {:else if ui.mode === "generator"}
-    <div class="hd"><h3>Gerador</h3></div>
-    <div class="wrapped" use:panel={makeGeneratorPanel}></div>
+    <div class="hd"><h3>Gradiente + Ruído</h3></div>
+    <GeneratorPanel />
   {:else}
     <div class="hd"><h3>Paleta</h3></div>
     <div class="wrapped" use:panel={makePalettePanel}></div>

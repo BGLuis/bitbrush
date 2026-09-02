@@ -51,22 +51,15 @@ Interesse explícito desde o início do projeto ("pequenos gifs"). Hoje:
 - Loop sem costura: escolher `Time` final onde a fase do fBm fecha, ou crossfade
   primeiro/último frame.
 
-### 2. Estado na URL para os painéis de gradiente / noisefield / paleta
+### 2. Estado na URL para o painel de paleta
 
 `CLAUDE.md` (secção *Determinism*): *"todo estado da ferramenta … deve ser URL-encodável
 para um resultado ser compartilhável e reproduzível"*.
 
-- Os 6 filtros fazem isto: `web/src/state.ts` (`?fx=<nome>&p.<chave>=<valor>`,
-  `readStateFromURL` / `writeStateToURL`).
-- Os painéis novos (`generators-panel.ts`, `palette-panel.ts`) **não** — as structs `Params`
-  em Go são serializáveis (JSON), mas o front nunca as escreve/lê na URL.
-- Impacto maior no **gradiente generativo**: foi desenhado com `Seed` + `Time` explícitos
-  justamente para ser reproduzível a partir de um link; hoje não é.
-
-**O que falta:** estender `state.ts` (ou um módulo paralelo) para serializar o modo ativo
-(filtro | gradiente multi-stop | gradiente generativo | paleta) e os params do painel
-correspondente. Formato sugerido para stops/spots:
-`stops=hex@pos-hex@pos&type&angle&interp&hue&ease` (ver `gurade-spec.md`).
+- Os 6 filtros e o **gradiente generativo / perceptual** fazem isto: `web/src/state.ts`
+  (`?fx=<nome>&p.<chave>=<valor>` para filtros, e
+  `?mode=generator&tool=noise&field=...&style=...&cols=...&spots=...` para o gerador).
+- Resta apenas o painel de paleta (`palette-panel.ts`) serializar seu estado na URL.
 
 ---
 
@@ -74,11 +67,13 @@ correspondente. Formato sugerido para stops/spots:
 
 | Item | Estado atual | Nota |
 |---|---|---|
-| Handles de spot arrastáveis sobre o canvas (Mesh/Freeform/Flow) | x/y numéricos no painel | É a interação-assinatura do toy de referência (anéis arrastáveis) |
+| Handles de spot arrastáveis sobre o canvas (Mesh/Freeform/Flow) | **Feito** (`CanvasSpotsOverlay.svelte`) | Anéis arrastáveis interativos sobre o canvas com badges de nome de cor, hex e suporte a teclado |
+| Painel do gerador em Svelte 5 nativo | **Feito** (`GeneratorPanel.svelte`) | Substituiu `generators-panel.ts` legado com 28 presets, bússola, shuffle harmônico e exportação |
+| Exportação PNG 1600px e código CSS no gradiente generativo | **Feito** | Render em 1600px e gerador de CSS com aproximação de camadas ou gradientes nativos |
 | Trocar o motor deixa o Worker antigo vivo | `resetBackend()` existe mas não é chamado; sem `dispose()` no `FilterBackend` | Vazamento pequeno; só ao alternar motor repetidamente |
 | Exportar a paleta inteira (CSS custom properties / array JSON / `.ase`) | swatch copia 1 hex no clique (`web/src/ui/widgets.ts` `swatchStrip`) | — |
 | `Control.showIf` em outros filtros | só aplicado ao `dither` | `glitch`: params de faixa só fazem sentido com `sliceCount > 0`; `ascii`: `background` só com `colored` |
-| Split "preview pequeno / export grande" nos painéis de gerador | renderiza no tamanho escolhido direto (limitado a 1024²) | Filtros têm isto via `web/src/preview.ts` + `settings.previewMaxDim` |
+| Split "preview pequeno / export grande" nos painéis de gerador | **Feito no gerador** (preview 960px / export 1600px) | Mantém 60fps no preview vivo |
 | Divergência GPU vs CPU no noisefield orgânico | ~30–45 de média nos campos Mesh/Freeform/Flow (`float` highp vs `float64`) | Documentado; port CPU é autoritativo para export. Geométricos batem ao pixel |
 
 ---

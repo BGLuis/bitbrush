@@ -3,11 +3,9 @@
 // native Svelte component later means deleting one factory here plus its source.
 
 import { renderGifPanel } from "../../gif";
-import { renderGeneratorPanel } from "../../generators-panel";
 import { renderPalettePanel } from "../../palette-panel";
 import { getBackend } from "../../backend";
-import { putImageData } from "../../canvas";
-import { ui, refs } from "../store.svelte";
+import { ui } from "../store.svelte";
 
 export function makeGifPanel() {
   return renderGifPanel({
@@ -18,20 +16,6 @@ export function makeGifPanel() {
     render: async (name, img, kfs, opt) =>
       (await getBackend(ui.settings.backend)).renderGIF(name, img, kfs, opt),
   });
-}
-
-export function makeGeneratorPanel() {
-  const p = renderGeneratorPanel({
-    renderGradient: async (params) => (await getBackend(ui.settings.backend)).renderGradient(params),
-    gradientCSS: async (params, opt) => (await getBackend(ui.settings.backend)).gradientCSS(params, opt),
-    renderNoiseField: async (params, w, h) =>
-      (await getBackend(ui.settings.backend)).renderNoiseField(params, w, h),
-    show: (img) => {
-      if (refs.canvas) putImageData(refs.canvas, img);
-    },
-  });
-  (p.element as HTMLDetailsElement).open = true;
-  return p;
 }
 
 export function makePalettePanel() {

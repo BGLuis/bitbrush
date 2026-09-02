@@ -8,6 +8,7 @@ import { effects, type EffectUI } from "../ui/controls";
 import { readStateFromURL } from "../state";
 import { readSettings, type Settings } from "../settings";
 import type { FilterParams } from "../wasm";
+import { generatorStore } from "./generator/generator-store.svelte";
 
 export type Mode = "filter" | "generator" | "palette";
 
@@ -28,10 +29,15 @@ export function defaultParams(name: string, seed?: FilterParams): FilterParams {
 }
 
 const url = readStateFromURL();
+const startMode = url.mode ?? "filter";
 const startEffect = url.effect && effectByName(url.effect) ? url.effect : effects[0].name;
 
+if (url.generator) {
+  generatorStore.hydrateFromURL(url.generator);
+}
+
 export const ui = $state({
-  mode: "filter" as Mode,
+  mode: startMode as Mode,
   effectName: startEffect,
   params: defaultParams(startEffect, url.effect ? url.params : undefined),
   original: null as ImageData | null,
