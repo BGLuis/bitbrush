@@ -18,8 +18,19 @@ any output can be reproduced from its parameters alone.
 
 v1 scope:
 
-- Six image filters: coloured ASCII art, pixelate (8-bit), Floyd–Steinberg dithering, Sobel edge
-  detection, glitch / RGB shift, colour quantization (poster).
+- Image filters: coloured ASCII art, pixelate (8-bit), dithering (error-diffusion —
+  Floyd–Steinberg / Atkinson / Stucki / Jarvis / Sierra / Burkes — plus an ordered Bayer mode),
+  Sobel edge detection, glitch / RGB shift, colour quantization (poster), halftone (AM screen,
+  mono / CMYK / RGB), Voronoi stippling (`stipple`, uses `internal/voronoi`).
+- Algorithmic generators — `internal/generators` registry + `internal/genall` link aggregator,
+  each generator a self-registering package: `truchet` (multi-scale Truchet tiles),
+  `harmonograph` (damped-sinusoid figure), `attractor` (De Jong / Clifford / Svensson density
+  plots), `contours` (fBm heightfield + marching-squares topo map), `flowfield` (Sumi-ink
+  flow-field strokes), `lsystem` (L-system turtle graphics), `flame` (fractal flames / IFS).
+  All are pure `func(json.RawMessage, w, h) (*image.RGBA, error)`, deterministic on seed, and
+  cross the boundary through `bitbrushRenderGenerator(name, paramsJSON, w, h)`. UI descriptors
+  live in `web/src/ui/generators.ts` (mirrors `ui/controls.ts`); no imperative panel surfaces
+  them yet — see BACKLOG.md.
 - Gradient generator + CSS tool — `internal/gradient`: multi-stop, angle, interpolation across
   sRGB / linear / HSL / Lab / LCh / OKLab / OKLCh with CSS Color 4 hue arcs, easing between
   stops (`linear` / named / `cubic-bezier()` / `steps()` / `linear()`), emits either baked hard
@@ -120,11 +131,20 @@ per row — the call overhead dominates.
 
 ### Registry pattern
 
-Filters and generators are registered by string name with a uniform signature (in
-`internal/filters/registry.go` and the equivalent for gradients). Adding an effect is a
-three-touch-point change: one new file in the core package + one registry line + one control
-descriptor in `web/src/ui/controls.ts` (rendered by `app/ParamControls.svelte`). Keep that
-shape — don't special-case individual effects in the adapter or the shell.
+Filters and generators are registered by string name with a uniform signature.
+
+- **Filters** — `internal/filters/registry.go`. Adding one is a three-touch-point change: one new
+  file in `internal/filters/` (calls `Register` from its `init()`) + one control descriptor in
+  `web/src/ui/controls.ts` (rendered by `app/ParamControls.svelte`). No adapter change — the
+  `bitbrushApplyFilter` global dispatches by name.
+- **Generators** (image from parameters alone, no input image) — `internal/generators/registry.go`.
+  Adding one: a new self-registering package under `internal/` + one blank-import line in
+  `internal/genall/genall.go` + one descriptor in `web/src/ui/generators.ts`. Signature
+  `func(json.RawMessage, w, h int) (*image.RGBA, error)`; dispatched by `bitbrushRenderGenerator`.
+- `internal/gradient` and `internal/noisefield` predate the generator registry and keep their own
+  dedicated globals.
+
+Keep that shape — don't special-case individual effects in the adapter or the shell.
 
 ### Shared pieces (do not duplicate)
 
@@ -143,13 +163,17 @@ URL-encodable so a result is shareable and reproducible.
 
 ```
 cmd/wasm/main.go        syscall/js adapter — filters, ascii, gif
-cmd/wasm/generators.go  syscall/js adapter — gradient / noisefield / palette globals
-internal/filters/       the six filters + registry
+cmd/wasm/generators.go  syscall/js adapter — gradient / noisefield / palette / generator globals
+internal/filters/       the image filters + registry (incl. halftone, stipple, dither kernels)
 internal/anim/          keyframe param interpolation + multi-frame render + animated GIF encode
 internal/gradient/      multi-stop gradient sampling, easing curves, CSS emission
 internal/noisefield/    generative noise-field gradient (Gradient Studio shader port)
 internal/palette/       median-cut / k-means extraction, sorting, harmony generation
 internal/colorspace/    sRGB/linear, OKLab(+inverse)/OKLCh, CIE Lab/LCh, HSL, gamut clamp
+internal/voronoi/       weighted Lloyd relaxation (jump-flooding) — backs the stipple filter
+internal/generators/    generator registry + shared paint helpers (fill / AA line / density acc)
+internal/genall/        blank-imports every generator package so cmd/wasm links them
+internal/{truchet,harmonograph,attractor,contours,flowfield,lsystem,flame}/  the generators
 web/                    Vite + Svelte 5 project
   index.html            <div id="app">
   svelte.config.js

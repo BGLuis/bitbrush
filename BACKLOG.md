@@ -5,6 +5,27 @@ Situação em 2026-09-02. Tudo que estava no escopo v1 (6 filtros, `internal/gra
 (Worker, seam de backend, pipeline de GIF, acelerador GPU) está **feito e verificado**.
 O que segue são as pontas soltas.
 
+## Feito depois do v1 (2026-09-02, segunda leva)
+
+- **Filtros novos:** `halftone` (trama AM mono/CMYK/RGB), `stipple` (pontilhado Voronoi
+  ponderado, sobre `internal/voronoi`), e `dither` estendido com núcleos de difusão
+  (Atkinson/Stucki/Jarvis/Sierra/Burkes) + modo `ordered` (Bayer 2/4/8). Cada um: core +
+  registry + descritor em `web/src/ui/controls.ts`. Cobertos por `go test`.
+- **Seam de geradores:** `internal/generators` (registry de string, auto-registro via
+  `init()`), `internal/genall` (agregador de blank-imports), global
+  `bitbrushRenderGenerator(name, paramsJSON, w, h)`, método `renderGenerator` nos três
+  backends + op `generator` no worker, `web/src/ui/generators.ts` (descritores).
+- **7 geradores:** `truchet`, `harmonograph`, `attractor` (De Jong/Clifford/Svensson),
+  `contours` (topográfico animado), `flowfield` (tinta sumi), `lsystem`, `flame` (fractal
+  flame). Todos determinísticos por seed, `go test` cobrindo cada um.
+
+**Ponta solta desta leva:** os descritores em `web/src/ui/generators.ts` existem mas **nenhum
+painel imperativo os expõe** ainda. É preciso um painel (ou uma seção no
+`generators-panel.ts`) que liste os geradores registrados, monte os controles a partir dos
+descritores e chame `backend.renderGenerator(...)` — mesmo tipo de fiação que falta ao
+noisefield (ver itens 1 e 2 abaixo). Enquanto isso, os geradores só são alcançáveis via a
+global WASM diretamente.
+
 ---
 
 ## Lacunas reais (estavam no plano, não foram feitas)
