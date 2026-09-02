@@ -163,6 +163,143 @@ func TestDitherDeterministic(t *testing.T) {
 	}
 }
 
+// fsRefGray reproduces the original hard-coded Floyd–Steinberg grayscale
+// path (7/3/5/1 over 16) so a refactor of diffuse1 can be caught if it
+// drifts by even one byte.
+func fsRefGray(src *image.RGBA, levels int, serpentine bool) *image.RGBA {
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	plane, _, _ := lumaPlane(src)
+	quant := levelQuant(levels)
+	for y := 0; y < h; y++ {
+		ltr := !serpentine || y%2 == 0
+		x, end, step := 0, w, 1
+		if !ltr {
+			x, end, step = w-1, -1, -1
+		}
+		for ; x != end; x += step {
+			i := y*w + x
+			old := plane[i]
+			q := quant(old)
+			plane[i] = q
+			e := old - q
+			if e == 0 {
+				continue
+			}
+			nx := x + step
+			if nx >= 0 && nx < w {
+				plane[y*w+nx] += e * (7.0 / 16)
+			}
+			if y+1 < h {
+				row := (y + 1) * w
+				if bx := x - step; bx >= 0 && bx < w {
+					plane[row+bx] += e * (3.0 / 16)
+				}
+				plane[row+x] += e * (5.0 / 16)
+				if nx >= 0 && nx < w {
+					plane[row+nx] += e * (1.0 / 16)
+				}
+			}
+		}
+	}
+	dst := newLike(src)
+	writeGrayPlane(dst, src, plane, w, h)
+	return dst
+}
+
+func TestDitherFloydSteinbergInvariant(t *testing.T) {
+	src := gradientImg(37, 29)
+	for _, levels := range []int{2, 3, 5} {
+		for _, serp := range []bool{true, false} {
+			want := fsRefGray(src, levels, serp)
+			got, err := Apply("dither", src, Params{
+				"levels": float64(levels), "grayscale": true, "serpentine": serp,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got.Pix, want.Pix) {
+				t.Fatalf("levels=%d serpentine=%v: refactored FS diverged from the reference", levels, serp)
+			}
+		}
+	}
+}
+
+func TestDitherKernelDefaultIsFloydSteinberg(t *testing.T) {
+	src := gradientImg(30, 22)
+	for _, params := range []Params{
+		{"mode": "levels", "grayscale": true, "levels": 3.0},
+		{"mode": "levels", "grayscale": false, "levels": 2.0},
+		{"mode": "palette", "colors": 8.0},
+	} {
+		def, err := Apply("dither", src, params)
+		if err != nil {
+			t.Fatal(err)
+		}
+		withKernel := Params{"kernel": "floyd-steinberg"}
+		for k, v := range params {
+			withKernel[k] = v
+		}
+		fs, err := Apply("dither", src, withKernel)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(def.Pix, fs.Pix) {
+			t.Fatalf("%v: unset kernel != explicit floyd-steinberg", params)
+		}
+	}
+}
+
+func TestDitherKernelsRunAndDeterministic(t *testing.T) {
+	img := gradientImg(40, 30)
+	for _, k := range []string{"floyd-steinberg", "atkinson", "stucki", "jarvis", "sierra", "burkes"} {
+		for _, params := range []Params{
+			{"mode": "levels", "grayscale": true, "levels": 2.0, "kernel": k},
+			{"mode": "palette", "colors": 8.0, "kernel": k},
+		} {
+			if _, err := Apply("dither", img, params); err != nil {
+				t.Fatalf("kernel %s %v: %v", k, params, err)
+			}
+			assertDeterministic(t, "dither", img, params)
+		}
+	}
+}
+
+func TestDitherOrderedRunsAndDeterministic(t *testing.T) {
+	img := gradientImg(48, 32)
+	for _, m := range []string{"2", "4", "8"} {
+		params := Params{"mode": "ordered", "matrix": m, "levels": 2.0, "grayscale": true}
+		if _, err := Apply("dither", img, params); err != nil {
+			t.Fatalf("matrix %s: %v", m, err)
+		}
+		assertDeterministic(t, "dither", img, params)
+	}
+	// colour path
+	assertDeterministic(t, "dither", img, Params{"mode": "ordered", "matrix": "4", "grayscale": false, "levels": 3.0})
+}
+
+func TestDitherOrderedMidGreyIsPatterned(t *testing.T) {
+	src := solid(32, 32, 128, 128, 128, 255)
+	out, err := Apply("dither", src, Params{"mode": "ordered", "matrix": "4", "levels": 2.0, "grayscale": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var black, white int
+	for i := 0; i < len(out.Pix); i += 4 {
+		switch out.Pix[i] {
+		case 0:
+			black++
+		case 255:
+			white++
+		default:
+			t.Fatalf("pixel %d = %d, want 0 or 255", i/4, out.Pix[i])
+		}
+	}
+	if black == 0 || white == 0 {
+		t.Fatalf("ordered dither of flat mid-grey should mix black and white, got black=%d white=%d", black, white)
+	}
+}
+
 func BenchmarkDitherLevelsGrayscale1080p(b *testing.B) {
 	src := gradientImg(1920, 1080)
 	p := Params{"levels": 2.0, "grayscale": true}

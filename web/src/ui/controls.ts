@@ -88,9 +88,31 @@ export const effects: EffectUI[] = [
   },
   {
     name: "dither",
-    title: "Dithering (Floyd–Steinberg)",
+    title: "Dithering (difusão de erro / ordenado)",
     controls: [
-      { key: "mode", label: "Modo", type: "select", options: ["levels", "palette"], default: "levels" },
+      {
+        key: "mode",
+        label: "Modo",
+        type: "select",
+        options: ["levels", "palette", "ordered"],
+        default: "levels",
+      },
+      {
+        key: "kernel",
+        label: "Núcleo de difusão",
+        type: "select",
+        options: ["floyd-steinberg", "atkinson", "stucki", "jarvis", "sierra", "burkes"],
+        default: "floyd-steinberg",
+        showIf: (v) => v.mode === "levels" || v.mode === "palette",
+      },
+      {
+        key: "matrix",
+        label: "Matriz de Bayer",
+        type: "select",
+        options: ["2", "4", "8"],
+        default: "4",
+        showIf: (v) => v.mode === "ordered",
+      },
       {
         key: "levels",
         label: "Níveis por canal",
@@ -99,14 +121,14 @@ export const effects: EffectUI[] = [
         max: 16,
         step: 1,
         default: 2,
-        showIf: (v) => v.mode === "levels",
+        showIf: (v) => v.mode === "levels" || v.mode === "ordered",
       },
       {
         key: "grayscale",
         label: "Escala de cinza",
         type: "checkbox",
         default: true,
-        showIf: (v) => v.mode === "levels",
+        showIf: (v) => v.mode === "levels" || v.mode === "ordered",
       },
       {
         key: "colors",
