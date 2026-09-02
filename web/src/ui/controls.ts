@@ -190,6 +190,21 @@ export const effects: EffectUI[] = [
     ],
   },
   {
+    name: "stipple",
+    title: "Pontilhado Voronoi (stippling)",
+    controls: [
+      { key: "points", label: "Número de pontos", type: "range", min: 100, max: 20000, step: 100, default: 4000 },
+      { key: "iterations", label: "Iterações (Lloyd)", type: "range", min: 0, max: 80, step: 1, default: 30 },
+      { key: "seed", label: "Semente", type: "seed", default: 0 },
+      { key: "minRadius", label: "Raio mín.", type: "range", min: 0.2, max: 4, step: 0.1, default: 0.6 },
+      { key: "maxRadius", label: "Raio máx.", type: "range", min: 0.5, max: 8, step: 0.1, default: 2.4 },
+      { key: "gamma", label: "Gama da densidade", type: "range", min: 0.2, max: 3, step: 0.05, default: 1 },
+      { key: "invert", label: "Inverter densidade", type: "checkbox", default: false },
+      { key: "ink", label: "Tinta (hex)", type: "text", default: "#111111" },
+      { key: "paper", label: "Papel (hex)", type: "text", default: "#f5f2ea" },
+    ],
+  },
+  {
     name: "glitch",
     title: "Glitch / RGB Shift",
     controls: [
