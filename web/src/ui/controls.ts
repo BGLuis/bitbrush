@@ -130,6 +130,44 @@ export const effects: EffectUI[] = [
     ],
   },
   {
+    name: "halftone",
+    title: "Meio-tom (Halftone)",
+    controls: [
+      { key: "cellSize", label: "Tamanho da célula (px)", type: "range", min: 2, max: 64, step: 1, default: 6 },
+      { key: "angleDeg", label: "Ângulo da trama (°)", type: "range", min: 0, max: 90, step: 1, default: 45 },
+      {
+        key: "shape",
+        label: "Forma do ponto",
+        type: "select",
+        options: ["circle", "square", "diamond", "line"],
+        default: "circle",
+      },
+      {
+        key: "channels",
+        label: "Canais",
+        type: "select",
+        options: ["mono", "cmyk", "rgb"],
+        default: "mono",
+      },
+      { key: "gamma", label: "Gama", type: "range", min: 0.2, max: 3, step: 0.05, default: 1 },
+      { key: "invert", label: "Inverter", type: "checkbox", default: false },
+      {
+        key: "ink",
+        label: "Tinta (hex)",
+        type: "text",
+        default: "#000000",
+        showIf: (v) => v.channels === "mono",
+      },
+      {
+        key: "paper",
+        label: "Papel (hex)",
+        type: "text",
+        default: "#ffffff",
+        showIf: (v) => v.channels === "mono",
+      },
+    ],
+  },
+  {
     name: "glitch",
     title: "Glitch / RGB Shift",
     controls: [
