@@ -157,4 +157,19 @@ export const generators: GeneratorUI[] = [
       { key: "ink", label: "Traço (hex)", type: "text", default: "#dfe7d0" },
     ],
   },
+  {
+    name: "flame",
+    title: "Fractal flame (IFS)",
+    defaultSize: { width: 1024, height: 1024 },
+    controls: [
+      { key: "seed", label: "Semente (deriva o conjunto)", type: "seed", default: 0 },
+      { key: "transforms", label: "Transformações", type: "range", min: 2, max: 6, step: 1, default: 3 },
+      { key: "iterations", label: "Iterações", type: "range", min: 100000, max: 20000000, step: 100000, default: 2000000 },
+      { key: "gamma", label: "Gama (tone map)", type: "range", min: 0.5, max: 6, step: 0.1, default: 2.4 },
+      { key: "vibrancy", label: "Vibração da cor", type: "range", min: 0, max: 1, step: 0.05, default: 0.85 },
+      { key: "hueSpread", label: "Espalhamento de matiz", type: "range", min: 0, max: 1, step: 0.05, default: 0.7 },
+      { key: "symmetry", label: "Simetria rotacional", type: "range", min: 0, max: 12, step: 1, default: 0 },
+      { key: "background", label: "Fundo (hex)", type: "text", default: "#050507" },
+    ],
+  },
 ];

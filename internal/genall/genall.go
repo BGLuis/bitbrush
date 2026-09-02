@@ -7,6 +7,7 @@ package genall
 import (
 	_ "bitbrush/internal/attractor"
 	_ "bitbrush/internal/contours"
+	_ "bitbrush/internal/flame"
 	_ "bitbrush/internal/flowfield"
 	_ "bitbrush/internal/harmonograph"
 	_ "bitbrush/internal/lsystem"
