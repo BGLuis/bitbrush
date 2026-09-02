@@ -42,4 +42,21 @@ export const generators: GeneratorUI[] = [
       { key: "ink", label: "Traço (hex)", type: "text", default: "#f2efe6" },
     ],
   },
+  {
+    name: "harmonograph",
+    title: "Harmonógrafo",
+    defaultSize: { width: 1024, height: 1024 },
+    controls: [
+      { key: "seed", label: "Semente", type: "seed", default: 0 },
+      { key: "pendulums", label: "Pêndulos por eixo", type: "range", min: 1, max: 4, step: 1, default: 2 },
+      { key: "damping", label: "Amortecimento", type: "range", min: 0, max: 0.05, step: 0.001, default: 0.006 },
+      { key: "freqSpread", label: "Desafinação", type: "range", min: 0, max: 0.2, step: 0.002, default: 0.012 },
+      { key: "duration", label: "Duração", type: "range", min: 20, max: 2000, step: 10, default: 220 },
+      { key: "steps", label: "Amostras", type: "range", min: 2000, max: 400000, step: 1000, default: 60000 },
+      { key: "lineAlpha", label: "Opacidade do traço", type: "range", min: 0.005, max: 1, step: 0.005, default: 0.06 },
+      { key: "colorful", label: "Colorido", type: "checkbox", default: false },
+      { key: "background", label: "Fundo (hex)", type: "text", default: "#0e0e12" },
+      { key: "ink", label: "Traço (hex)", type: "text", default: "#e9e6dc" },
+    ],
+  },
 ];
