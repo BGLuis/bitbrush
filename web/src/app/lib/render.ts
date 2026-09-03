@@ -14,24 +14,35 @@ interface Job {
   pref: BackendPref;
 }
 
-let pendingRaf = false;
+let debounceTimer: number | undefined;
 let latest: Job | null = null;
+let queuedJob: Job | null = null;
+let inFlight = false;
 let seq = 0;
 
-/** Ask for a render. Rapid calls (slider drags) collapse to one rAF that runs
- *  with the freshest job; a slow async result that lands after a newer request
- *  is dropped rather than painted. */
+/** Ask for a render. Rapid calls (slider drags) collapse into an in-flight gate
+ *  with a gentle 50ms debounce: slider movements remain fluid while heavy
+ *  filters wait for the user to pause/settle before computing. */
 export function scheduleFilterRender(job: Job): void {
   latest = job;
-  if (pendingRaf) return;
-  pendingRaf = true;
-  requestAnimationFrame(() => {
-    pendingRaf = false;
-    if (latest) void run(latest);
-  });
+  if (inFlight) {
+    queuedJob = job;
+    return;
+  }
+  if (debounceTimer !== undefined) {
+    clearTimeout(debounceTimer);
+  }
+  debounceTimer = window.setTimeout(() => {
+    debounceTimer = undefined;
+    if (latest && !inFlight) {
+      void run(latest);
+    }
+  }, 50);
 }
 
 async function run(job: Job): Promise<void> {
+  inFlight = true;
+  queuedJob = null;
   const mine = ++seq;
   try {
     const backend = await getBackend(job.pref);
@@ -40,5 +51,13 @@ async function run(job: Job): Promise<void> {
     putImageData(job.canvas, out);
   } catch (err) {
     console.error(err);
+  } finally {
+    inFlight = false;
+    if (queuedJob) {
+      const next = queuedJob;
+      queuedJob = null;
+      void run(next);
+    }
   }
 }
+

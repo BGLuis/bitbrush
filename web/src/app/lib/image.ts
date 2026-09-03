@@ -29,7 +29,32 @@ export async function loadFile(file: File): Promise<void> {
   const canvas = refs.canvas;
   if (!canvas) return;
   ui.original = drawImageToCanvas(canvas, img);
-  recomputePreview();
+  ui.preview = downscaleImageElement(img, ui.settings.previewMaxDim);
+}
+
+function downscaleImageElement(img: HTMLImageElement, maxDim: number): ImageData {
+  const longest = Math.max(img.naturalWidth, img.naturalHeight);
+  if (!Number.isFinite(maxDim) || maxDim <= 0 || longest <= maxDim) {
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("2d context unavailable");
+    ctx.drawImage(img, 0, 0);
+    return ctx.getImageData(0, 0, c.width, c.height);
+  }
+  const scale = maxDim / longest;
+  const w = Math.max(1, Math.round(img.naturalWidth * scale));
+  const h = Math.max(1, Math.round(img.naturalHeight * scale));
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("2d context unavailable");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h);
 }
 
 /** Re-derive the capped working copy — call after the preview-resolution

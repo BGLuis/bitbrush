@@ -10,7 +10,7 @@ export function makePalettePanel() {
   const p = renderPalettePanel({
     extractPalette: async (img, opt) => (await getBackend(ui.settings.backend)).extractPalette(img, opt),
     genPalette: async (opt) => (await getBackend(ui.settings.backend)).genPalette(opt),
-    source: () => ui.original,
+    source: () => ui.preview ?? ui.original,
   });
   (p.element as HTMLDetailsElement).open = true;
   return p;

@@ -36,8 +36,12 @@ func Relax(sites []Site, weight []float64, w, h, iterations int) []Site {
 	sumX := make([]float64, n)
 	sumY := make([]float64, n)
 
+	// Reusable buffers for JFA: zero heap allocations during the relaxation loop
+	bufA := make([]int, w*h)
+	bufB := make([]int, w*h)
+
 	for it := 0; it < iterations; it++ {
-		owner := nearestSites(out, w, h)
+		owner := nearestSitesBuf(out, w, h, bufA, bufB)
 		for i := range sumW {
 			sumW[i], sumX[i], sumY[i] = 0, 0, 0
 		}
@@ -70,14 +74,19 @@ func Relax(sites []Site, weight []float64, w, h, iterations int) []Site {
 
 // nearestSites returns, for every pixel, the index of its nearest site.
 func nearestSites(sites []Site, w, h int) []int {
-	owner := make([]int, w*h)
-	for i := range owner {
-		owner[i] = -1
+	bufA := make([]int, w*h)
+	bufB := make([]int, w*h)
+	return nearestSitesBuf(sites, w, h, bufA, bufB)
+}
+
+func nearestSitesBuf(sites []Site, w, h int, curr, next []int) []int {
+	for i := range curr {
+		curr[i] = -1
 	}
 	for i, s := range sites {
 		x := clampi(int(s.X), 0, w-1)
 		y := clampi(int(s.Y), 0, h-1)
-		owner[y*w+x] = i // fixed iteration order => deterministic on collision
+		curr[y*w+x] = i // fixed iteration order => deterministic on collision
 	}
 
 	step := 1
@@ -85,13 +94,15 @@ func nearestSites(sites []Site, w, h int) []int {
 		step <<= 1
 	}
 	for step >>= 1; step >= 1; step >>= 1 {
-		jfaPass(owner, sites, w, h, step)
+		jfaPassBuf(curr, next, sites, w, h, step)
+		curr, next = next, curr
 	}
-	jfaPass(owner, sites, w, h, 1) // JFA+1 refinement
+	jfaPassBuf(curr, next, sites, w, h, 1) // JFA+1 refinement
+	curr, next = next, curr
 
 	// Fallback for any pixel still unassigned.
-	for idx := 0; idx < len(owner); idx++ {
-		if owner[idx] >= 0 {
+	for idx := 0; idx < len(curr); idx++ {
+		if curr[idx] >= 0 {
 			continue
 		}
 		x, y := idx%w, idx/w
@@ -102,40 +113,46 @@ func nearestSites(sites []Site, w, h int) []int {
 				bestD, best = d, i
 			}
 		}
-		owner[idx] = best
+		curr[idx] = best
 	}
-	return owner
+	return curr
 }
 
-func jfaPass(owner []int, sites []Site, w, h, step int) {
-	src := append([]int(nil), owner...)
+func jfaPassBuf(src, dst []int, sites []Site, w, h, step int) {
 	for y := 0; y < h; y++ {
+		py := float64(y) + 0.5
 		for x := 0; x < w; x++ {
 			best := src[y*w+x]
 			bestD := math.MaxFloat64
+			px := float64(x) + 0.5
 			if best >= 0 {
-				bestD = dist2(sites[best], x, y)
+				s := sites[best]
+				dx, dy := s.X-px, s.Y-py
+				bestD = dx*dx + dy*dy
 			}
 			for dy := -1; dy <= 1; dy++ {
 				ny := y + dy*step
 				if ny < 0 || ny >= h {
 					continue
 				}
+				row := ny * w
 				for dx := -1; dx <= 1; dx++ {
 					nx := x + dx*step
 					if nx < 0 || nx >= w {
 						continue
 					}
-					o := src[ny*w+nx]
+					o := src[row+nx]
 					if o < 0 {
 						continue
 					}
-					if d := dist2(sites[o], x, y); d < bestD {
+					s := sites[o]
+					dxs, dys := s.X-px, s.Y-py
+					if d := dxs*dxs + dys*dys; d < bestD {
 						bestD, best = d, o
 					}
 				}
 			}
-			owner[y*w+x] = best
+			dst[y*w+x] = best
 		}
 	}
 }

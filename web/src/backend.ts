@@ -72,8 +72,7 @@ export interface FilterBackend {
   accelerates(name: string): boolean;
 }
 
-let current: Promise<FilterBackend> | null = null;
-let activePref: BackendPref = "auto";
+const instances = new Map<BackendPref, Promise<FilterBackend>>();
 
 // Registered by whichever module owns each implementation, so backend.ts
 // doesn't import the Worker or WebGL code (and their bundles) unless asked.
@@ -85,18 +84,16 @@ export function registerBackend(kind: keyof typeof factories, make: Factory): vo
 }
 
 /**
- * Resolve the backend for a preference, reusing the last one when the
- * preference is unchanged. "auto" prefers the Worker (no main-thread jank),
- * then GPU, then main-thread CPU; "cpu" forces a CPU path (Worker if
- * present); "gpu" forces GPU and throws if it isn't available. Candidates
- * are tried in order and the first whose init() succeeds wins, so a Worker
- * that can't start (CSP, no WASM in workers) transparently falls back to
- * the main-thread engine.
+ * Resolve the backend for a preference, reusing the cached backend per preference.
+ * "auto" prefers the Worker (no main-thread jank), then GPU, then main-thread CPU;
+ * "cpu" forces a CPU path (Worker if present); "gpu" forces GPU and throws if it isn't available.
+ * Candidates are tried in order and the first whose init() succeeds wins.
  */
 export function getBackend(pref: BackendPref = "auto"): Promise<FilterBackend> {
-  if (current && pref === activePref) return current;
-  activePref = pref;
-  current = (async () => {
+  const cached = instances.get(pref);
+  if (cached) return cached;
+
+  const p = (async () => {
     const errors: unknown[] = [];
     for (const make of candidates(pref)) {
       try {
@@ -109,7 +106,9 @@ export function getBackend(pref: BackendPref = "auto"): Promise<FilterBackend> {
     }
     throw new AggregateError(errors, `no usable backend for preference "${pref}"`);
   })();
-  return current;
+
+  instances.set(pref, p);
+  return p;
 }
 
 function candidates(pref: BackendPref): Factory[] {
@@ -127,7 +126,7 @@ function candidates(pref: BackendPref): Factory[] {
   return [cpuWorker, gpu, cpu].filter((f): f is Factory => Boolean(f));
 }
 
-/** Drop the cached backend so the next getBackend() rebuilds it. */
+/** Drop the cached backends so the next getBackend() rebuilds them. */
 export function resetBackend(): void {
-  current = null;
+  instances.clear();
 }

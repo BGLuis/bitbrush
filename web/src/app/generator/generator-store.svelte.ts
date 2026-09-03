@@ -68,6 +68,8 @@ class GeneratorStore {
   #lastTime = 0;
   #rafId = 0;
   #pending = false;
+  #inFlight = false;
+  #queuedRender = false;
   #drawSeq = 0;
   #statusTimer = 0;
 
@@ -146,7 +148,8 @@ class GeneratorStore {
   });
 
   previewDimensions = $derived.by(() => {
-    return calculateOutputDimensions(this.ratio, 960);
+    const cap = ui.settings.previewMaxDim > 0 ? ui.settings.previewMaxDim : 720;
+    return calculateOutputDimensions(this.ratio, cap);
   });
 
   exportDimensions = $derived.by(() => {
@@ -302,15 +305,20 @@ class GeneratorStore {
   startAnimation() {
     if (this.#rafId || !this.animate || !this.isOrganic || this.generatorMode !== "noise") return;
     this.#lastTime = performance.now();
-    const frame = (now: number) => {
+    const frame = async (now: number) => {
       this.#rafId = 0;
-      if (!this.animate || !this.isOrganic || this.generatorMode !== "noise" || document.hidden) {
+      if (!this.animate || !this.isOrganic || this.generatorMode !== "noise" || (typeof document !== "undefined" && document.hidden)) {
         return;
       }
-      this.#clock += Math.min(0.1, (now - this.#lastTime) / 1000);
+      const delta = Math.min(0.1, (now - this.#lastTime) / 1000);
+      this.#clock += delta;
       this.#lastTime = now;
-      void this.renderFrame();
-      this.#rafId = requestAnimationFrame(frame);
+      if (!this.#inFlight) {
+        await this.renderFrame();
+      }
+      if (this.animate && this.isOrganic && this.generatorMode === "noise" && !(typeof document !== "undefined" && document.hidden)) {
+        this.#rafId = requestAnimationFrame(frame);
+      }
     };
     this.#rafId = requestAnimationFrame(frame);
   }
@@ -332,11 +340,17 @@ class GeneratorStore {
 
   scheduleRender() {
     this.updateURL();
+    if (this.#inFlight) {
+      this.#queuedRender = true;
+      return;
+    }
     if (this.#pending) return;
     this.#pending = true;
     requestAnimationFrame(() => {
       this.#pending = false;
-      void this.renderFrame();
+      if (!this.#inFlight) {
+        void this.renderFrame();
+      }
     });
   }
 
@@ -376,9 +390,22 @@ class GeneratorStore {
   }
 
   async renderFrame(): Promise<void> {
+    if (this.#inFlight) {
+      this.#queuedRender = true;
+      return;
+    }
+    this.#inFlight = true;
+    this.#queuedRender = false;
     const seq = ++this.#drawSeq;
     try {
-      const backend = await getBackend(ui.settings.backend);
+      // Prioritize WebGL2 (GPU) in "auto" mode for noisefield rendering when available
+      const pref = ui.settings.backend === "auto" ? "gpu" : ui.settings.backend;
+      let backend;
+      try {
+        backend = await getBackend(pref);
+      } catch {
+        backend = await getBackend("auto");
+      }
       const canvas = refs.canvas;
       if (!canvas) return;
 
@@ -409,6 +436,12 @@ class GeneratorStore {
       }
     } catch (err) {
       console.error("Generator render error:", err);
+    } finally {
+      this.#inFlight = false;
+      if (this.#queuedRender) {
+        this.#queuedRender = false;
+        void this.renderFrame();
+      }
     }
   }
 

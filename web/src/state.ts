@@ -112,19 +112,49 @@ export function readStateFromURL(): URLState {
   };
 }
 
+let replaceStateTimer: number | undefined;
+let pendingURL: string | null = null;
+
+export function flushURLState(): void {
+  if (replaceStateTimer !== undefined) {
+    clearTimeout(replaceStateTimer);
+    replaceStateTimer = undefined;
+  }
+  if (pendingURL !== null && typeof history !== "undefined") {
+    try {
+      history.replaceState(null, "", pendingURL);
+    } catch {}
+    pendingURL = null;
+  }
+}
+
+function debouncedReplaceState(url: string, immediate = false): void {
+  pendingURL = url;
+  if (immediate) {
+    flushURLState();
+    return;
+  }
+  if (replaceStateTimer !== undefined) {
+    clearTimeout(replaceStateTimer);
+  }
+  replaceStateTimer = window.setTimeout(() => {
+    flushURLState();
+  }, 300);
+}
+
 // Writes active filter and params to URL query string
-export function writeStateToURL(effect: string, params: FilterParams): void {
+export function writeStateToURL(effect: string, params: FilterParams, immediate = false): void {
   const q = new URLSearchParams();
   q.set(EFFECT_KEY, effect);
   for (const [key, value] of Object.entries(params)) {
     q.set(PARAM_PREFIX + key, String(value));
   }
   const url = `${location.pathname}?${q.toString()}${location.hash}`;
-  history.replaceState(null, "", url);
+  debouncedReplaceState(url, immediate);
 }
 
 // Writes active generator state to URL query string
-export function writeGeneratorStateToURL(state: GeneratorURLState): void {
+export function writeGeneratorStateToURL(state: GeneratorURLState, immediate = false): void {
   const q = new URLSearchParams();
   q.set(MODE_KEY, "generator");
   q.set("tool", state.tool);
@@ -166,7 +196,7 @@ export function writeGeneratorStateToURL(state: GeneratorURLState): void {
   }
 
   const url = `${location.pathname}?${q.toString()}${location.hash}`;
-  history.replaceState(null, "", url);
+  debouncedReplaceState(url, immediate);
 }
 
 function decodeValue(raw: string): number | string | boolean {
