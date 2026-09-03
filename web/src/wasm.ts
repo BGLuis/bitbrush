@@ -41,6 +41,13 @@ declare global {
     w: number,
     h: number,
   ): { ok: boolean; data: Uint8Array | null; error: string };
+  function bitbrushRenderNoiseFieldGIF(
+    startParamsJSON: string,
+    endParamsJSON: string,
+    w: number,
+    h: number,
+    optionsJSON: string,
+  ): { ok: boolean; data: Uint8Array | null; error: string };
   function bitbrushRenderGenerator(
     name: string,
     paramsJSON: string,
@@ -225,6 +232,24 @@ export function renderNoiseField(params: NoiseFieldParams, w: number, h: number)
   const res = bitbrushRenderNoiseField(JSON.stringify(params), w, h);
   if (!res.ok || !res.data) throw new Error(res.error || "noise field render failed");
   return new ImageData(new Uint8ClampedArray(res.data), w, h);
+}
+
+export function renderNoiseFieldGIF(
+  start: NoiseFieldParams,
+  end: NoiseFieldParams,
+  w: number,
+  h: number,
+  options: GifOptions,
+): Uint8Array {
+  const res = bitbrushRenderNoiseFieldGIF(
+    JSON.stringify(start),
+    JSON.stringify(end),
+    w,
+    h,
+    JSON.stringify(options),
+  );
+  if (!res.ok || !res.data) throw new Error(res.error || "noise field gif failed");
+  return res.data;
 }
 
 // A flat param bag for the algorithmic generators (internal/generators

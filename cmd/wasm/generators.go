@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"syscall/js"
 
+	"bitbrush/internal/anim"
 	"bitbrush/internal/generators"
 	"bitbrush/internal/gradient"
 	"bitbrush/internal/noisefield"
@@ -22,6 +23,7 @@ func registerGenerators() {
 	js.Global().Set("bitbrushRenderGradient", js.FuncOf(renderGradient))
 	js.Global().Set("bitbrushGradientCSS", js.FuncOf(gradientCSS))
 	js.Global().Set("bitbrushRenderNoiseField", js.FuncOf(renderNoiseField))
+	js.Global().Set("bitbrushRenderNoiseFieldGIF", js.FuncOf(renderNoiseFieldGIF))
 	js.Global().Set("bitbrushRenderGenerator", js.FuncOf(renderGenerator))
 	js.Global().Set("bitbrushExtractPalette", js.FuncOf(extractPalette))
 	js.Global().Set("bitbrushGenPalette", js.FuncOf(genPalette))
@@ -132,17 +134,7 @@ var nfTexture = map[string]noisefield.Texture{
 	"wrinkle": noisefield.TextureWrinkle, "paper": noisefield.TexturePaper,
 }
 
-// bitbrushRenderNoiseField(paramsJSON string, w int, h int) ->
-// {ok, data: Uint8Array|null, error}. paramsJSON:
-// {field, style, texture, stops:[hex], spots:[{color,x,y}], angle, scale,
-// distortion, seed, time} — enums as lower-case names.
-func renderNoiseField(_ js.Value, args []js.Value) (result any) {
-	defer func() {
-		if r := recover(); r != nil {
-			result = map[string]any{"ok": false, "data": js.Null(), "error": fmt.Sprintf("panic: %v", r)}
-		}
-	}()
-
+func parseNoiseFieldParams(jsonStr string) (noisefield.Params, error) {
 	var p struct {
 		Field   string   `json:"field"`
 		Style   string   `json:"style"`
@@ -159,15 +151,15 @@ func renderNoiseField(_ js.Value, args []js.Value) (result any) {
 		Seed       int64   `json:"seed"`
 		Time       float64 `json:"time"`
 	}
-	if err := json.Unmarshal([]byte(args[0].String()), &p); err != nil {
-		return errData(fmt.Errorf("bad params: %w", err))
+	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil {
+		return noisefield.Params{}, fmt.Errorf("bad params: %w", err)
 	}
 
 	stops := make([]noisefield.RGB, 0, len(p.Stops))
 	for _, s := range p.Stops {
 		c, err := gradient.ParseHex(s)
 		if err != nil {
-			return errData(fmt.Errorf("bad stop %q: %w", s, err))
+			return noisefield.Params{}, fmt.Errorf("bad stop %q: %w", s, err)
 		}
 		stops = append(stops, noisefield.RGB{R: c.R, G: c.G, B: c.B})
 	}
@@ -175,12 +167,12 @@ func renderNoiseField(_ js.Value, args []js.Value) (result any) {
 	for _, s := range p.Spots {
 		c, err := gradient.ParseHex(s.Color)
 		if err != nil {
-			return errData(fmt.Errorf("bad spot colour %q: %w", s.Color, err))
+			return noisefield.Params{}, fmt.Errorf("bad spot colour %q: %w", s.Color, err)
 		}
 		spots = append(spots, noisefield.Spot{Color: noisefield.RGB{R: c.R, G: c.G, B: c.B}, X: s.X, Y: s.Y})
 	}
 
-	img := noisefield.Render(noisefield.Params{
+	return noisefield.Params{
 		Field:      nfField[p.Field],
 		Style:      nfStyle[p.Style],
 		Texture:    nfTexture[p.Texture],
@@ -191,8 +183,72 @@ func renderNoiseField(_ js.Value, args []js.Value) (result any) {
 		Distortion: p.Distortion,
 		Seed:       p.Seed,
 		Time:       p.Time,
-	}, args[1].Int(), args[2].Int())
+	}, nil
+}
+
+// bitbrushRenderNoiseField(paramsJSON string, w int, h int) ->
+// {ok, data: Uint8Array|null, error}.
+func renderNoiseField(_ js.Value, args []js.Value) (result any) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = map[string]any{"ok": false, "data": js.Null(), "error": fmt.Sprintf("panic: %v", r)}
+		}
+	}()
+
+	params, err := parseNoiseFieldParams(args[0].String())
+	if err != nil {
+		return errData(err)
+	}
+
+	img := noisefield.Render(params, args[1].Int(), args[2].Int())
 	return okData(img.Pix)
+}
+
+// bitbrushRenderNoiseFieldGIF(startJSON string, endJSON string, w int, h int, optionsJSON string) ->
+// {ok, data: Uint8Array|null, error}.
+func renderNoiseFieldGIF(_ js.Value, args []js.Value) (result any) {
+	defer func() {
+		if r := recover(); r != nil {
+			result = map[string]any{"ok": false, "data": js.Null(), "error": fmt.Sprintf("panic: %v", r)}
+		}
+	}()
+
+	startP, err := parseNoiseFieldParams(args[0].String())
+	if err != nil {
+		return errData(fmt.Errorf("bad start params: %w", err))
+	}
+	endP, err := parseNoiseFieldParams(args[1].String())
+	if err != nil {
+		return errData(fmt.Errorf("bad end params: %w", err))
+	}
+
+	w, h := args[2].Int(), args[3].Int()
+
+	var optJSON struct {
+		Frames       int  `json:"frames"`
+		FPS          int  `json:"fps"`
+		Loop         bool `json:"loop"`
+		PingPong     bool `json:"pingPong"`
+		MaxDimension int  `json:"maxDimension"`
+	}
+	if err := json.Unmarshal([]byte(args[4].String()), &optJSON); err != nil {
+		return errData(fmt.Errorf("bad options: %w", err))
+	}
+
+	data, err := anim.RenderNoiseField(startP, endP, anim.Options{
+		Frames:       optJSON.Frames,
+		FPS:          optJSON.FPS,
+		LoopForever:  optJSON.Loop,
+		PingPong:     optJSON.PingPong,
+		MaxDimension: optJSON.MaxDimension,
+	}, w, h)
+	if err != nil {
+		return errData(err)
+	}
+
+	dst := js.Global().Get("Uint8Array").New(len(data))
+	js.CopyBytesToJS(dst, data)
+	return map[string]any{"ok": true, "data": dst, "error": ""}
 }
 
 // bitbrushRenderGenerator(name string, paramsJSON string, w int, h int) ->

@@ -49,6 +49,13 @@ self.onmessage = async (e) => {
       self.postMessage({ id: req.id, ok: true, buf: out.buffer, width: req.width, height: req.height }, [out.buffer]);
       return;
     }
+    if (req.op === "noisefieldGif") {
+      const r = bitbrushRenderNoiseFieldGIF(req.startParams, req.endParams, req.width, req.height, req.options);
+      if (!r.ok || !r.data) throw new Error(r.error || "noise field gif failed");
+      const out = r.data.slice();
+      self.postMessage({ id: req.id, ok: true, buf: out.buffer }, [out.buffer]);
+      return;
+    }
     if (req.op === "generator") {
       const r = bitbrushRenderGenerator(req.name, req.params, req.width, req.height);
       if (!r.ok || !r.data) throw new Error(r.error || "generator render failed");

@@ -11,6 +11,7 @@ import {
   renderGradient as wasmRenderGradient,
   gradientCSS as wasmGradientCSS,
   renderNoiseField as wasmRenderNoiseField,
+  renderNoiseFieldGIF as wasmRenderNoiseFieldGIF,
   renderGenerator as wasmRenderGenerator,
   extractPalette as wasmExtractPalette,
   genPalette as wasmGenPalette,
@@ -60,6 +61,16 @@ class CpuBackend implements FilterBackend {
 
   async renderNoiseField(params: NoiseFieldParams, w: number, h: number): Promise<ImageData> {
     return wasmRenderNoiseField(params, w, h);
+  }
+
+  async renderNoiseFieldGIF(
+    start: NoiseFieldParams,
+    end: NoiseFieldParams,
+    w: number,
+    h: number,
+    options: GifOptions,
+  ): Promise<Uint8Array> {
+    return wasmRenderNoiseFieldGIF(start, end, w, h, options);
   }
 
   async renderGenerator(

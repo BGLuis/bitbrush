@@ -128,6 +128,24 @@ class WorkerBackend implements FilterBackend {
     return new ImageData(new Uint8ClampedArray(r.buf!), r.width!, r.height!);
   }
 
+  async renderNoiseFieldGIF(
+    start: NoiseFieldParams,
+    end: NoiseFieldParams,
+    w: number,
+    h: number,
+    options: GifOptions,
+  ): Promise<Uint8Array> {
+    const r = await this.#send({
+      op: "noisefieldGif",
+      startParams: JSON.stringify(start),
+      endParams: JSON.stringify(end),
+      width: w,
+      height: h,
+      options: JSON.stringify(options),
+    });
+    return new Uint8Array(r.buf!);
+  }
+
   async renderGenerator(
     name: string,
     params: GeneratorParams,

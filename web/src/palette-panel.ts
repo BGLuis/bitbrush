@@ -82,7 +82,12 @@ export function renderPalettePanel(deps: PalettePanelDeps): PalettePanel {
 
   const exStatus = document.createElement("p");
   exStatus.className = "gif-status";
+  let lastExtracted: string[] = [];
+  let lastHarmony: string[] = [];
+
   const exSwatches = swatchStrip();
+  const exExportActions = makePaletteExportActions(() => lastExtracted);
+  exExportActions.style.display = "none";
 
   const exBtn = button("Extrair da imagem", async () => {
     const img = deps.source();
@@ -101,8 +106,10 @@ export function renderPalettePanel(deps: PalettePanelDeps): PalettePanel {
         alphaThreshold: 0,
         seed: exSeed.get(),
       });
+      lastExtracted = cols;
       exSwatches.update(cols);
       exStatus.textContent = `${cols.length} cores`;
+      exExportActions.style.display = cols.length > 0 ? "flex" : "none";
     } catch (err) {
       console.error(err);
       exStatus.textContent = `Falhou: ${String(err)}`;
@@ -119,6 +126,7 @@ export function renderPalettePanel(deps: PalettePanelDeps): PalettePanel {
   const hmSpread = numberInput(30, 5, 90, 1);
   const hmSpreadRow = lr("Passo de matiz", hmSpread.el);
   const hmSwatches = swatchStrip();
+  const hmExportActions = makePaletteExportActions(() => lastHarmony);
 
   const syncSpread = () => {
     hmSpreadRow.hidden = !["analogous", "split"].includes(hmRule.get());
@@ -135,7 +143,9 @@ export function renderPalettePanel(deps: PalettePanelDeps): PalettePanel {
         wheel: hmWheel.get(),
         spread: hmSpread.get(),
       });
+      lastHarmony = cols;
       hmSwatches.update(cols);
+      hmExportActions.style.display = cols.length > 0 ? "flex" : "none";
     } catch (err) {
       console.error(err);
     }
@@ -164,6 +174,7 @@ export function renderPalettePanel(deps: PalettePanelDeps): PalettePanel {
     rowOf(exBtn),
     exStatus,
     exSwatches.element,
+    exExportActions,
     heading("Gerar por harmonia"),
     lr("Cor base", hmBase.el),
     lr("Regra", hmRule.el),
@@ -171,6 +182,7 @@ export function renderPalettePanel(deps: PalettePanelDeps): PalettePanel {
     lr("Roda de matiz", hmWheel.el),
     hmSpreadRow,
     hmSwatches.element,
+    hmExportActions,
   );
 
   root.addEventListener("toggle", () => {
@@ -178,4 +190,72 @@ export function renderPalettePanel(deps: PalettePanelDeps): PalettePanel {
   });
 
   return { element: root };
+}
+
+function makePaletteExportActions(getCols: () => string[]): HTMLElement {
+  const container = document.createElement("div");
+  container.className = "widget-row";
+  container.style.marginTop = "0.3rem";
+  container.style.display = "flex";
+  container.style.gap = "6px";
+  container.style.flexWrap = "wrap";
+
+  const btnCSS = button("Copiar CSS", () => {
+    const cols = getCols();
+    if (cols.length === 0) return;
+    const css = `:root {\n` + cols.map((c, i) => `  --palette-${i + 1}: ${c};`).join("\n") + `\n}`;
+    void navigator.clipboard?.writeText(css);
+    btnCSS.textContent = "✓ CSS Copiado!";
+    setTimeout(() => (btnCSS.textContent = "Copiar CSS"), 1400);
+  });
+
+  const btnJSON = button("Copiar JSON", () => {
+    const cols = getCols();
+    if (cols.length === 0) return;
+    const json = JSON.stringify(cols, null, 2);
+    void navigator.clipboard?.writeText(json);
+    btnJSON.textContent = "✓ JSON Copiado!";
+    setTimeout(() => (btnJSON.textContent = "Copiar JSON"), 1400);
+  });
+
+  const btnPNG = button("Baixar PNG", () => {
+    const cols = getCols();
+    if (cols.length === 0) return;
+    const swatchW = 100;
+    const swatchH = 120;
+    const canvas = document.createElement("canvas");
+    canvas.width = swatchW * cols.length;
+    canvas.height = swatchH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.fillStyle = "#121118";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < cols.length; i++) {
+      const c = cols[i];
+      ctx.fillStyle = c;
+      ctx.fillRect(i * swatchW + 4, 4, swatchW - 8, swatchH - 36);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 12px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(c, i * swatchW + swatchW / 2, swatchH - 12);
+    }
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "bitbrush-palette.png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    }, "image/png");
+  });
+
+  container.append(btnCSS, btnJSON, btnPNG);
+  return container;
 }

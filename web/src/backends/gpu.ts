@@ -16,6 +16,7 @@ import {
   renderGIF as wasmRenderGIF,
   renderGradient as wasmRenderGradient,
   gradientCSS as wasmGradientCSS,
+  renderNoiseFieldGIF as wasmRenderNoiseFieldGIF,
   renderGenerator as wasmRenderGenerator,
   extractPalette as wasmExtractPalette,
   genPalette as wasmGenPalette,
@@ -242,6 +243,16 @@ class GpuBackend implements FilterBackend {
 
   async renderNoiseField(params: NoiseFieldParams, w: number, h: number): Promise<ImageData> {
     return this.#noiseGPU(params, w, h);
+  }
+
+  async renderNoiseFieldGIF(
+    start: NoiseFieldParams,
+    end: NoiseFieldParams,
+    w: number,
+    h: number,
+    options: GifOptions,
+  ): Promise<Uint8Array> {
+    return wasmRenderNoiseFieldGIF(start, end, w, h, options); // multi-frame: CPU core
   }
 
   // Algorithmic generators (attractors, harmonographs, ...) have no shader

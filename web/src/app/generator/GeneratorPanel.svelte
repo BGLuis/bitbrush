@@ -292,17 +292,24 @@
           class="export-btn primary"
           onclick={() => generatorStore.exportHighResPNG()}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
           </svg>
-          Baixar PNG (1600px)
+          PNG 1600px
+        </button>
+        <button
+          type="button"
+          class="export-btn"
+          onclick={() => generatorStore.exportSVG()}
+        >
+          Baixar SVG
         </button>
         <button
           type="button"
           class="export-btn"
           onclick={() => generatorStore.copyCSS()}
         >
-          {generatorStore.copiedCSS ? "✓ Copiado!" : "Copiar Código CSS"}
+          {generatorStore.copiedCSS ? "✓ Copiado!" : "Copiar CSS"}
         </button>
       </div>
 
@@ -476,6 +483,13 @@
           onclick={() => generatorStore.exportHighResPNG()}
         >
           Baixar PNG
+        </button>
+        <button
+          type="button"
+          class="export-btn"
+          onclick={() => generatorStore.exportSVG()}
+        >
+          Baixar SVG
         </button>
         <button
           type="button"
@@ -753,8 +767,8 @@
   }
   .export-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
     margin-bottom: 6px;
   }
   .export-btn {

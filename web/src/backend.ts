@@ -49,6 +49,14 @@ export interface FilterBackend {
   gradientCSS(params: GradientParams, options: GradientCSSOptions): Promise<string>;
   /** Render a generative noise-field gradient (internal/noisefield). */
   renderNoiseField(params: NoiseFieldParams, w: number, h: number): Promise<ImageData>;
+  /** Render an animated GIF from noise-field gradient params (internal/anim). */
+  renderNoiseFieldGIF(
+    start: NoiseFieldParams,
+    end: NoiseFieldParams,
+    w: number,
+    h: number,
+    options: GifOptions,
+  ): Promise<Uint8Array>;
   /** Render a named algorithmic generator (internal/generators registry). */
   renderGenerator(name: string, params: GeneratorParams, w: number, h: number): Promise<ImageData>;
   /** Extract a palette from an image (internal/palette). */

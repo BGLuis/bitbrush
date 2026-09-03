@@ -5,8 +5,12 @@
   import { panel } from "./lib/panel";
   import { renderSettings } from "../settings";
 
+  import { getBackend } from "../backend";
+  import { generatorStore } from "./generator/generator-store.svelte";
+
   let settingsOpen = $state(false);
   let shareLabel = $state("Compartilhar");
+  let exportLabel = $state("Exportar PNG");
 
   const recipe = $derived.by(() => {
     if (ui.mode === "generator") return "gerador · gradiente / ruído";
@@ -31,19 +35,51 @@
     setTimeout(() => (shareLabel = "Compartilhar"), 1400);
   }
 
-  function exportPng() {
-    const canvas = refs.canvas;
-    if (!canvas) return;
-    const name = ui.mode === "filter" ? ui.effectName : ui.mode;
+  function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
     canvas.toBlob((blob) => {
       if (!blob) return;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `bitbrush-${name}.png`;
+      a.download = filename;
+      document.body.appendChild(a);
       a.click();
+      a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 15_000);
     }, "image/png");
+  }
+
+  async function exportPng() {
+    if (ui.mode === "generator") {
+      void generatorStore.exportHighResPNG();
+      return;
+    }
+
+    const src = ui.original ?? ui.preview;
+    if (!src) {
+      const canvas = refs.canvas;
+      if (!canvas) return;
+      downloadCanvas(canvas, `bitbrush-${ui.mode}.png`);
+      return;
+    }
+
+    exportLabel = "Processando...";
+    try {
+      const backend = await getBackend(ui.settings.backend);
+      const out = await backend.applyFilter(ui.effectName, src, ui.params);
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = out.width;
+      tempCanvas.height = out.height;
+      const ctx = tempCanvas.getContext("2d")!;
+      ctx.putImageData(out, 0, 0);
+      downloadCanvas(tempCanvas, `bitbrush-${ui.effectName}-${out.width}x${out.height}.png`);
+      exportLabel = "✓ Salvo!";
+      setTimeout(() => (exportLabel = "Exportar PNG"), 1500);
+    } catch (err) {
+      console.error(err);
+      exportLabel = "Erro ao exportar";
+      setTimeout(() => (exportLabel = "Exportar PNG"), 2000);
+    }
   }
 </script>
 
@@ -63,7 +99,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
       </svg>
-      Exportar PNG
+      {exportLabel}
     </button>
     <div class="gearwrap">
       <button

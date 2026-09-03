@@ -1,8 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { ui, refs, effectByName } from "./store.svelte";
-  import { panel } from "./lib/panel";
-  import { makeGifPanel } from "./lib/wrapped";
+  import GifPanel from "./gif/GifPanel.svelte";
   import { openFilePicker } from "./lib/image";
   import { generatorStore } from "./generator/generator-store.svelte";
   import CanvasSpotsOverlay from "./generator/CanvasSpotsOverlay.svelte";
@@ -72,10 +71,10 @@
     {/if}
   </div>
 
-  {#if ui.mode === "filter"}
-    {#key ui.effectName}
-      <div class="giframe" use:panel={makeGifPanel}></div>
-    {/key}
+  {#if ui.mode === "filter" || ui.mode === "generator"}
+    <div class="giframe">
+      <GifPanel />
+    </div>
   {/if}
 </section>
 

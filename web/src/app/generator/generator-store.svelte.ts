@@ -468,6 +468,67 @@ class GeneratorStore {
       this.setStatus("Erro ao exportar PNG.");
     }
   }
+
+  exportSVG(): void {
+    const { w, h } = this.exportDimensions;
+    let svgContent = "";
+
+    if (this.generatorMode === "multistop") {
+      const rad = ((this.msAngle - 90) * Math.PI) / 180;
+      const x1 = Math.round(50 - Math.cos(rad) * 50);
+      const y1 = Math.round(50 - Math.sin(rad) * 50);
+      const x2 = Math.round(50 + Math.cos(rad) * 50);
+      const y2 = Math.round(50 + Math.sin(rad) * 50);
+
+      const stopsXML = [...this.msStops]
+        .sort((a, b) => a.pos - b.pos)
+        .map((s) => `      <stop offset="${(s.pos * 100).toFixed(1)}%" stop-color="${s.color}" />`)
+        .join("\n");
+
+      svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <defs>
+    <linearGradient id="bitbrush-grad" x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%">
+${stopsXML}
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bitbrush-grad)" />
+</svg>`;
+    } else {
+      const colors = sanitizeColors(this.colors);
+      const stopsXML = colors
+        .map((c, i) => {
+          const pct = ((i / Math.max(1, colors.length - 1)) * 100).toFixed(1);
+          return `      <stop offset="${pct}%" stop-color="${c}" />`;
+        })
+        .join("\n");
+
+      const rad = ((this.direction - 90) * Math.PI) / 180;
+      const x1 = Math.round(50 - Math.cos(rad) * 50);
+      const y1 = Math.round(50 - Math.sin(rad) * 50);
+      const x2 = Math.round(50 + Math.cos(rad) * 50);
+      const y2 = Math.round(50 + Math.sin(rad) * 50);
+
+      svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <defs>
+    <linearGradient id="bitbrush-grad" x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%">
+${stopsXML}
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bitbrush-grad)" />
+</svg>`;
+    }
+
+    const blob = new Blob([svgContent], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bitbrush-gradient-${this.generatorMode}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    this.setStatus("Vetor SVG baixado com sucesso!");
+  }
 }
 
 export const generatorStore = new GeneratorStore();
