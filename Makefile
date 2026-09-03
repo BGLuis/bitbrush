@@ -2,7 +2,7 @@ GOROOT := $(shell go env GOROOT)
 WASM_OUT := web/public/main.wasm
 WASM_EXEC := web/public/wasm_exec.js
 
-.PHONY: wasm dev build test check clean
+.PHONY: wasm wasm-tiny dev build test check clean
 
 wasm:
 	GOOS=js GOARCH=wasm go build -o $(WASM_OUT) ./cmd/wasm
@@ -11,6 +11,10 @@ wasm:
 	else \
 		cp "$(GOROOT)/misc/wasm/wasm_exec.js" $(WASM_EXEC); \
 	fi
+
+wasm-tiny:
+	tinygo build -o $(WASM_OUT) -target=wasm ./cmd/wasm
+	@cp "$$(tinygo env TINYGOROOT)/targets/wasm_exec.js" $(WASM_EXEC)
 
 dev: wasm
 	cd web && npm run dev
