@@ -77,3 +77,15 @@ func TestFlowFieldBadParams(t *testing.T) {
 		t.Fatal("want error on malformed JSON")
 	}
 }
+
+func TestFlowFieldTimeAnimates(t *testing.T) {
+	t0 := run(t, `{"seed":42,"density":0.6,"time":0}`, 160, 120)
+	t1 := run(t, `{"seed":42,"density":0.6,"time":5.0}`, 160, 120)
+	t0Repeat := run(t, `{"seed":42,"density":0.6,"time":0}`, 160, 120)
+	if !bytes.Equal(t0.Pix, t0Repeat.Pix) {
+		t.Fatal("same time should be deterministic")
+	}
+	if bytes.Equal(t0.Pix, t1.Pix) {
+		t.Fatal("different time should animate flow field")
+	}
+}

@@ -26,6 +26,7 @@ type params struct {
 	Colorful   bool    `json:"colorful"`   // sweep hue along the curve
 	Background string  `json:"background"`
 	Ink        string  `json:"ink"`
+	Time       float64 `json:"time"`
 }
 
 func defaults() params {
@@ -65,7 +66,7 @@ func render(raw json.RawMessage, w, h int) (*image.RGBA, error) {
 			ts[i] = term{
 				amp:   0.5 + rng.Float64()*0.8,
 				freq:  base + p.FreqSpread*randn(),
-				phase: rng.Float64() * 2 * math.Pi,
+				phase: rng.Float64()*2*math.Pi + p.Time*0.4*float64(i+1),
 				decay: p.Damping * (0.6 + rng.Float64()*0.8),
 			}
 		}

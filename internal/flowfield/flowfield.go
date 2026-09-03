@@ -23,6 +23,7 @@ type params struct {
 	Palette    string  `json:"palette"`    // ink | indigo | vermilion
 	Grain      float64 `json:"grain"`      // 0..1 paper grain amount
 	Background string  `json:"background"` // optional override of the palette paper
+	Time       float64 `json:"time"`       // temporal offset for continuous animation
 }
 
 func defaults() params {
@@ -66,17 +67,18 @@ func render(raw json.RawMessage, w, h int) (*image.RGBA, error) {
 
 	// Field heading at a point.
 	const f = 0.0022
+	t := p.Time * 0.15
 	angleAt := func(x, y float64) float64 {
 		if p.Curl {
 			const e = 1.0
 			phi := func(px, py float64) float64 {
-				return noise.noise2(px*f, py*f)*0.7 + noise.noise2(px*f*2.3+31.7, py*f*2.3-12.1)*0.3
+				return noise.noise2(px*f+t*0.5, py*f+t*0.3)*0.7 + noise.noise2(px*f*2.3+31.7-t*0.4, py*f*2.3-12.1+t*0.2)*0.3
 			}
 			dx := phi(x+e, y) - phi(x-e, y)
 			dy := phi(x, y+e) - phi(x, y-e)
 			return math.Atan2(-dx, dy) // curl: rotate the gradient 90 degrees
 		}
-		n := noise.noise2(x*f, y*f)*0.7 + noise.noise2(x*f*2.3+31.7, y*f*2.3-12.1)*0.3
+		n := noise.noise2(x*f+t*0.5, y*f+t*0.3)*0.7 + noise.noise2(x*f*2.3+31.7-t*0.4, y*f*2.3-12.1+t*0.2)*0.3
 		return n * math.Pi * p.Turbulence
 	}
 

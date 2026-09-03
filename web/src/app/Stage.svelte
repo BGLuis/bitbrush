@@ -10,8 +10,23 @@
 
   onMount(() => {
     refs.canvas = canvasEl;
+
+    const handleKeydown = (e: KeyboardEvent) => {
+      if (e.code === "Space" && canAnimate) {
+        const activeTag = (document.activeElement?.tagName || "").toLowerCase();
+        if (activeTag === "input" || activeTag === "textarea" || activeTag === "select") {
+          return;
+        }
+        e.preventDefault();
+        generatorStore.toggleAnimation();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeydown);
+
     return () => {
       refs.canvas = null;
+      window.removeEventListener("keydown", handleKeydown);
     };
   });
 
@@ -43,14 +58,34 @@
           : (DESCS[ui.effectName] ?? ""),
   );
 
+  const canAnimate = $derived(
+    (ui.mode === "generator" && generatorStore.generatorMode === "noise" && generatorStore.isOrganic) ||
+    ((ui.mode === "generator" || ui.mode === "pattern") && generatorStore.generatorMode === "patterns" && generatorStore.patternHasTime)
+  );
+
   const needsImage = $derived(ui.mode === "filter" || ui.mode === "palette");
   const showEmpty = $derived(needsImage && ui.original === null);
 </script>
 
 <section class="stage">
   <header class="hd">
-    <span class="t">{title}</span>
-    <span class="d">{desc}</span>
+    <div class="titles">
+      <span class="t">{title}</span>
+      <span class="d">{desc}</span>
+    </div>
+    {#if canAnimate}
+      <button
+        type="button"
+        class="play-toggle-btn"
+        class:playing={generatorStore.animate}
+        onclick={() => generatorStore.toggleAnimation()}
+        title="Pausar / Retomar animação ao vivo [Espaço]"
+      >
+        <span class="icon">{generatorStore.animate ? "⏸" : "▶"}</span>
+        <span>{generatorStore.animate ? "Pausar" : "Animar"}</span>
+        <kbd>Espaço</kbd>
+      </button>
+    {/if}
   </header>
 
   <div class="viewport">
@@ -91,10 +126,17 @@
   }
   .hd {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 22px;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .titles {
+    display: flex;
     align-items: baseline;
     gap: 14px;
-    padding: 13px 22px;
-    border-bottom: 1px solid var(--line-soft);
+    min-width: 0;
   }
   .t {
     font-family: var(--disp);
@@ -104,6 +146,41 @@
   .d {
     color: var(--mute);
     font-size: 12px;
+  }
+  .play-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--surface-2, #18191f);
+    color: var(--fg, #f0f0f4);
+    border: 1px solid var(--line-soft, #2e303c);
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .play-toggle-btn:hover {
+    background: var(--surface-3, #22232c);
+    border-color: var(--accent, #a78bfa);
+  }
+  .play-toggle-btn.playing {
+    border-color: var(--accent, #a78bfa);
+    color: var(--accent, #a78bfa);
+  }
+  .play-toggle-btn .icon {
+    font-size: 11px;
+  }
+  .play-toggle-btn kbd {
+    font-size: 10px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 1px 5px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--mute, #888);
+    font-family: var(--mono, monospace);
   }
   .viewport {
     flex: 1;

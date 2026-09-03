@@ -315,13 +315,14 @@
 
       {#if generatorStore.isOrganic}
         <div class="anim-control">
-          <label class="checkbox-label">
+          <label class="checkbox-label" title="Pausar / Retomar animação ao vivo [Espaço]">
             <input
               type="checkbox"
               checked={generatorStore.animate}
               onchange={() => generatorStore.toggleAnimation()}
             />
             <span>Animar fluxo no preview vivo</span>
+            <kbd style="font-size: 10px; margin-left: 6px; opacity: 0.6; font-family: var(--mono, monospace);">Espaço</kbd>
           </label>
         </div>
       {/if}

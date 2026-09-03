@@ -73,3 +73,15 @@ func TestHarmonographClampsAndBadParams(t *testing.T) {
 		t.Fatal("want error on malformed JSON")
 	}
 }
+
+func TestHarmonographTimeAnimates(t *testing.T) {
+	t0 := run(t, `{"seed":12,"steps":8000,"time":0}`, 180, 180)
+	t1 := run(t, `{"seed":12,"steps":8000,"time":2.5}`, 180, 180)
+	t0Repeat := run(t, `{"seed":12,"steps":8000,"time":0}`, 180, 180)
+	if !bytes.Equal(t0.Pix, t0Repeat.Pix) {
+		t.Fatal("same time should be deterministic")
+	}
+	if bytes.Equal(t0.Pix, t1.Pix) {
+		t.Fatal("different time should animate harmonograph")
+	}
+}

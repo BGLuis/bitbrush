@@ -13,11 +13,19 @@ export function drawImageToCanvas(
 }
 
 export function putImageData(canvas: HTMLCanvasElement, img: ImageData): void {
-  canvas.width = img.width;
-  canvas.height = img.height;
+  if (canvas.width !== img.width) canvas.width = img.width;
+  if (canvas.height !== img.height) canvas.height = img.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("2d context unavailable");
   ctx.putImageData(img, 0, 0);
+}
+
+export function blitCanvas(target: HTMLCanvasElement, source: HTMLCanvasElement): void {
+  if (target.width !== source.width) target.width = source.width;
+  if (target.height !== source.height) target.height = source.height;
+  const ctx = target.getContext("2d");
+  if (!ctx) throw new Error("2d context unavailable");
+  ctx.drawImage(source, 0, 0);
 }
 
 export async function loadImageFile(file: File): Promise<HTMLImageElement> {

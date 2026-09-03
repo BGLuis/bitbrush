@@ -31,32 +31,44 @@ interface Reply {
 class WorkerBackend implements FilterBackend {
   readonly kind = "cpu-worker" as const;
 
-  #worker: Worker | null = null;
+  #workers: Worker[] = [];
   #seq = 1;
   #pending = new Map<number, { resolve: (r: Reply) => void; reject: (e: unknown) => void }>();
+  #roundRobin = 0;
 
-  init(): Promise<void> {
+  async init(): Promise<void> {
     if (typeof Worker === "undefined") {
       return Promise.reject(new Error("Web Workers unavailable"));
     }
-    const worker = new Worker(new URL("../worker/filter-worker.ts", import.meta.url), {
-      type: "classic",
-    });
-    worker.onmessage = (e: MessageEvent) => {
-      const r = e.data as Reply;
-      const waiter = this.#pending.get(r.id);
-      if (!waiter) return;
-      this.#pending.delete(r.id);
-      r.ok ? waiter.resolve(r) : waiter.reject(new Error(r.error || "worker error"));
-    };
-    worker.onerror = (e) => {
-      // Fail every in-flight call; new calls will reject on a null #worker.
-      for (const [, w] of this.#pending) w.reject(new Error(e.message || "worker crashed"));
-      this.#pending.clear();
-      this.#worker = null;
-    };
-    this.#worker = worker;
-    return this.#send({ op: "init" }).then(() => undefined);
+    const poolSize = Math.max(
+      1,
+      Math.min(
+        4,
+        typeof navigator !== "undefined" && navigator.hardwareConcurrency
+          ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2))
+          : 2,
+      ),
+    );
+    const inits: Promise<void>[] = [];
+    for (let i = 0; i < poolSize; i++) {
+      const worker = new Worker(new URL("../worker/filter-worker.ts", import.meta.url), {
+        type: "classic",
+      });
+      worker.onmessage = (e: MessageEvent) => {
+        const r = e.data as Reply;
+        const waiter = this.#pending.get(r.id);
+        if (!waiter) return;
+        this.#pending.delete(r.id);
+        r.ok ? waiter.resolve(r) : waiter.reject(new Error(r.error || "worker error"));
+      };
+      worker.onerror = (e) => {
+        for (const [, w] of this.#pending) w.reject(new Error(e.message || "worker crashed"));
+        this.#pending.clear();
+      };
+      this.#workers.push(worker);
+      inits.push(this.#sendToWorker(worker, { op: "init" }).then(() => undefined));
+    }
+    await Promise.all(inits);
   }
 
   async applyFilter(name: string, img: ImageData, params: FilterParams): Promise<ImageData> {
@@ -180,14 +192,19 @@ class WorkerBackend implements FilterBackend {
     return true;
   }
 
-  #send(msg: Record<string, unknown>, transfer: Transferable[] = []): Promise<Reply> {
-    const worker = this.#worker;
-    if (!worker) return Promise.reject(new Error("worker not running"));
+  #sendToWorker(worker: Worker, msg: Record<string, unknown>, transfer: Transferable[] = []): Promise<Reply> {
     const id = this.#seq++;
     return new Promise<Reply>((resolve, reject) => {
       this.#pending.set(id, { resolve, reject });
       worker.postMessage({ id, ...msg }, transfer);
     });
+  }
+
+  #send(msg: Record<string, unknown>, transfer: Transferable[] = []): Promise<Reply> {
+    if (this.#workers.length === 0) return Promise.reject(new Error("no workers running"));
+    const worker = this.#workers[this.#roundRobin % this.#workers.length];
+    this.#roundRobin++;
+    return this.#sendToWorker(worker, msg, transfer);
   }
 }
 

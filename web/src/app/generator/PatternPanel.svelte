@@ -56,7 +56,7 @@
           class="quick-btn"
           class:active={generatorStore.animate}
           onclick={() => generatorStore.toggleAnimation()}
-          title="Iniciar ou pausar animação contínua ao vivo"
+          title="Iniciar ou pausar animação contínua ao vivo [Espaço]"
         >
           {generatorStore.animate ? "⏸ Pausar" : "▶ Animar ao Vivo"}
         </button>

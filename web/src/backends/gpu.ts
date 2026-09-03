@@ -22,6 +22,7 @@ import {
   genPalette as wasmGenPalette,
 } from "../wasm";
 import { registerBackend, type FilterBackend } from "../backend";
+import { blitCanvas } from "../canvas";
 import type {
   FilterParams,
   GifKeyframe,
@@ -196,7 +197,12 @@ class GpuBackend implements FilterBackend {
 
   async init(): Promise<void> {
     const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2");
+    const gl = canvas.getContext("webgl2", {
+      preserveDrawingBuffer: true,
+      alpha: false,
+      antialias: false,
+      powerPreference: "high-performance",
+    });
     if (!gl) throw new Error("WebGL2 unavailable");
     this.#gl = gl;
     this.#pixelate = linkProgram(gl, VERT, FRAG_PIXELATE);
@@ -243,6 +249,18 @@ class GpuBackend implements FilterBackend {
 
   async renderNoiseField(params: NoiseFieldParams, w: number, h: number): Promise<ImageData> {
     return this.#noiseGPU(params, w, h);
+  }
+
+  renderNoiseFieldToCanvas(
+    targetCanvas: HTMLCanvasElement,
+    params: NoiseFieldParams,
+    w: number,
+    h: number,
+  ): void {
+    const gl = this.#gl!;
+    this.#resize(w, h);
+    this.#renderNoisePass(params, w, h, null);
+    blitCanvas(targetCanvas, gl.canvas as HTMLCanvasElement);
   }
 
   async renderNoiseFieldGIF(
@@ -324,8 +342,21 @@ class GpuBackend implements FilterBackend {
 
   #noiseGPU(params: NoiseFieldParams, w: number, h: number): ImageData {
     const gl = this.#gl!;
-    const prog = this.#noise!;
     this.#resize(w, h);
+    this.#renderNoisePass(params, w, h, this.#fbo);
+    const out = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, out);
+    return new ImageData(new Uint8ClampedArray(out.buffer), w, h);
+  }
+
+  #renderNoisePass(
+    params: NoiseFieldParams,
+    w: number,
+    h: number,
+    targetFbo: WebGLFramebuffer | null,
+  ): void {
+    const gl = this.#gl!;
+    const prog = this.#noise!;
 
     const organic = NF_ORGANIC.has(params.field);
     const scale = Math.min(100, Math.max(0, params.scale)) / 100;
@@ -365,7 +396,7 @@ class GpuBackend implements FilterBackend {
       }
     }
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.#fbo);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, targetFbo);
     gl.viewport(0, 0, w, h);
     gl.useProgram(prog);
     gl.bindVertexArray(this.#vao);
@@ -385,10 +416,6 @@ class GpuBackend implements FilterBackend {
     gl.uniform1f(u("u_warp"), warp);
     gl.uniform1f(u("u_seed"), uSeed);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-
-    const out = new Uint8Array(w * h * 4);
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, out);
-    return new ImageData(new Uint8ClampedArray(out.buffer), w, h);
   }
 }
 

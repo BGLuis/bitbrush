@@ -49,6 +49,13 @@ export interface FilterBackend {
   gradientCSS(params: GradientParams, options: GradientCSSOptions): Promise<string>;
   /** Render a generative noise-field gradient (internal/noisefield). */
   renderNoiseField(params: NoiseFieldParams, w: number, h: number): Promise<ImageData>;
+  /** Direct GPU zero-copy blit to target canvas without gl.readPixels. */
+  renderNoiseFieldToCanvas?(
+    targetCanvas: HTMLCanvasElement,
+    params: NoiseFieldParams,
+    w: number,
+    h: number,
+  ): void;
   /** Render an animated GIF from noise-field gradient params (internal/anim). */
   renderNoiseFieldGIF(
     start: NoiseFieldParams,

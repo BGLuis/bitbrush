@@ -228,7 +228,6 @@ class GeneratorStore {
   selectPattern(name: string) {
     this.selectedPattern = name;
     this.ratio = name === "contours" || name === "flowfield" ? "16/10" : "1/1";
-    this.animate = false;
     this.#patternClock = 0;
     this.scheduleRender();
     this.syncAnimation();
@@ -540,7 +539,9 @@ class GeneratorStore {
         if (this.animate && this.patternHasTime && "time" in params) {
           params.time = Number(((params.time ?? 0) + this.#patternClock).toFixed(3));
         }
-        const img = await backend.renderGenerator(
+        // Run pattern calculations on the background worker pool to keep the UI thread 100% free
+        const workerBackend = await getBackend("cpu").catch(() => backend);
+        const img = await workerBackend.renderGenerator(
           this.selectedPattern,
           params,
           w,
@@ -550,9 +551,13 @@ class GeneratorStore {
         putImageData(canvas, img);
       } else if (this.generatorMode === "noise") {
         const { w, h } = this.previewDimensions;
-        const img = await backend.renderNoiseField(this.getNoiseParams(), w, h);
-        if (seq !== this.#drawSeq) return;
-        putImageData(canvas, img);
+        if (backend.renderNoiseFieldToCanvas) {
+          backend.renderNoiseFieldToCanvas(canvas, this.getNoiseParams(), w, h);
+        } else {
+          const img = await backend.renderNoiseField(this.getNoiseParams(), w, h);
+          if (seq !== this.#drawSeq) return;
+          putImageData(canvas, img);
+        }
       } else {
         const { w, h } = this.previewDimensions;
         const p = this.getGradientParams(w, h);
