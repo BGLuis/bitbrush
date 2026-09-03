@@ -25,18 +25,22 @@
   };
 
   const title = $derived(
-    ui.mode === "generator"
-      ? "Gradiente + Ruído"
-      : ui.mode === "palette"
-        ? "Paleta"
-        : (effectByName(ui.effectName)?.title ?? ui.effectName),
+    ui.mode === "pattern"
+      ? (generatorStore.currentPatternUI?.title ?? "Padrões Algorítmicos")
+      : ui.mode === "generator"
+        ? "Gradiente + Ruído"
+        : ui.mode === "palette"
+          ? "Paleta"
+          : (effectByName(ui.effectName)?.title ?? ui.effectName),
   );
   const desc = $derived(
-    ui.mode === "generator"
-      ? "Gradiente multi-stop (CSS Color 4) ou campo de ruído generativo — desenha direto no canvas."
-      : ui.mode === "palette"
-        ? "Extração por median-cut / k-means, ou geração por regra de harmonia."
-        : (DESCS[ui.effectName] ?? ""),
+    ui.mode === "pattern"
+      ? "Geração algorítmica determinística pura — curvas de nível, campo de fluxo, atratores e fractais."
+      : ui.mode === "generator"
+        ? "Gradiente multi-stop (CSS Color 4) ou campo de ruído generativo — desenha direto no canvas."
+        : ui.mode === "palette"
+          ? "Extração por median-cut / k-means, ou geração por regra de harmonia."
+          : (DESCS[ui.effectName] ?? ""),
   );
 
   const needsImage = $derived(ui.mode === "filter" || ui.mode === "palette");
@@ -52,9 +56,9 @@
   <div class="viewport">
     <div
       class="canvas-frame"
-      class:generator-mode={ui.mode === "generator"}
+      class:generator-mode={ui.mode === "generator" || ui.mode === "pattern"}
       class:hidden={showEmpty}
-      style={ui.mode === "generator"
+      style={ui.mode === "generator" || ui.mode === "pattern"
         ? `--ar: ${generatorStore.ratio}; --arn: ${generatorStore.aspectRatio};`
         : ""}
     >

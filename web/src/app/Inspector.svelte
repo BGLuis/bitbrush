@@ -2,6 +2,8 @@
   import { ui, effectByName, resetParams } from "./store.svelte";
   import ParamControls from "./ParamControls.svelte";
   import GeneratorPanel from "./generator/GeneratorPanel.svelte";
+  import PatternPanel from "./generator/PatternPanel.svelte";
+  import { generatorStore } from "./generator/generator-store.svelte";
   import { panel } from "./lib/panel";
   import { makePalettePanel } from "./lib/wrapped";
 
@@ -21,8 +23,15 @@
       </button>
     </div>
     <ParamControls />
+  {:else if ui.mode === "pattern"}
+    <div class="hd">
+      <h3>{generatorStore.currentPatternUI.title}</h3>
+    </div>
+    <PatternPanel />
   {:else if ui.mode === "generator"}
-    <div class="hd"><h3>Gradiente + Ruído</h3></div>
+    <div class="hd">
+      <h3>Gradiente + Ruído</h3>
+    </div>
     <GeneratorPanel />
   {:else}
     <div class="hd"><h3>Paleta</h3></div>

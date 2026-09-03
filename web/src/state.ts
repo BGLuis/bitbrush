@@ -9,7 +9,7 @@ const PARAM_PREFIX = "p.";
 const MODE_KEY = "mode";
 
 export interface GeneratorURLState {
-  tool: "noise" | "multistop";
+  tool: "noise" | "multistop" | "patterns";
   field?: string;
   style?: string;
   texture?: string;
@@ -25,10 +25,12 @@ export interface GeneratorURLState {
   easing?: string;
   kind?: string;
   stops?: Array<{ color: string; pos: number }>;
+  pattern?: string;
+  patternParams?: Record<string, any>;
 }
 
 export interface URLState {
-  mode: "filter" | "generator" | "palette";
+  mode: "filter" | "pattern" | "generator" | "palette";
   effect: string | null;
   params: FilterParams;
   generator?: GeneratorURLState;
@@ -38,11 +40,27 @@ export function readStateFromURL(): URLState {
   const q = new URLSearchParams(location.search);
   const rawMode = q.get(MODE_KEY);
 
-  if (rawMode === "generator" || q.has("gen") || q.has("field")) {
-    const tool = q.get("tool") === "multistop" ? "multistop" : "noise";
+  if (rawMode === "pattern" || rawMode === "generator" || q.has("gen") || q.has("field") || q.has("pattern")) {
+    const rawTool = q.get("tool");
+    const isPattern = rawMode === "pattern" || rawTool === "patterns" || q.has("pattern");
+    const tool =
+      rawTool === "multistop"
+        ? "multistop"
+        : isPattern
+          ? "patterns"
+          : "noise";
     const genState: GeneratorURLState = { tool };
 
-    if (tool === "noise") {
+    if (tool === "patterns") {
+      genState.pattern = q.get("pattern") || q.get("name") || "contours";
+      if (q.has("ar")) genState.ratio = q.get("ar")!;
+      const pParams: Record<string, any> = {};
+      for (const [key, raw] of q) {
+        if (!key.startsWith(PARAM_PREFIX)) continue;
+        pParams[key.slice(PARAM_PREFIX.length)] = decodeValue(raw);
+      }
+      genState.patternParams = pParams;
+    } else if (tool === "noise") {
       if (q.has("field")) genState.field = q.get("field")!;
       if (q.has("style")) genState.style = q.get("style")!;
       if (q.has("tex")) genState.texture = q.get("tex")!;
@@ -85,7 +103,7 @@ export function readStateFromURL(): URLState {
     }
 
     return {
-      mode: "generator",
+      mode: genState.tool === "patterns" ? "pattern" : "generator",
       effect: null,
       params: {},
       generator: genState,
@@ -156,10 +174,22 @@ export function writeStateToURL(effect: string, params: FilterParams, immediate 
 // Writes active generator state to URL query string
 export function writeGeneratorStateToURL(state: GeneratorURLState, immediate = false): void {
   const q = new URLSearchParams();
-  q.set(MODE_KEY, "generator");
-  q.set("tool", state.tool);
 
-  if (state.tool === "noise") {
+  if (state.tool === "patterns") {
+    q.set(MODE_KEY, "pattern");
+    if (state.pattern) q.set("pattern", state.pattern);
+    if (state.ratio) q.set("ar", state.ratio);
+    if (state.patternParams) {
+      for (const [key, value] of Object.entries(state.patternParams)) {
+        if (value !== undefined && value !== null && value !== "") {
+          q.set(PARAM_PREFIX + key, String(value));
+        }
+      }
+    }
+  } else {
+    q.set(MODE_KEY, "generator");
+    q.set("tool", state.tool);
+    if (state.tool === "noise") {
     if (state.field) q.set("field", state.field);
     if (state.style) q.set("style", state.style);
     if (state.texture) q.set("tex", state.texture);
@@ -194,6 +224,7 @@ export function writeGeneratorStateToURL(state: GeneratorURLState, immediate = f
       );
     }
   }
+}
 
   const url = `${location.pathname}?${q.toString()}${location.hash}`;
   debouncedReplaceState(url, immediate);

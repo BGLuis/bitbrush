@@ -6,6 +6,12 @@ import { getBackend } from "../../backend";
 import { putImageData } from "../../canvas";
 import { writeGeneratorStateToURL, type GeneratorURLState } from "../../state";
 import type { GradientParams, NoiseFieldParams } from "../../wasm";
+import { generators, type GeneratorUI } from "../../ui/generators";
+import {
+  type PatternPreset,
+  getPatternPresets,
+  buildDefaultParams,
+} from "./patterns-data";
 import {
   PRESETS,
   type Preset,
@@ -30,7 +36,11 @@ const reduceMotion =
 
 class GeneratorStore {
   // Mode selection
-  generatorMode = $state<"noise" | "multistop">("noise");
+  generatorMode = $state<"noise" | "multistop" | "patterns">("noise");
+
+  // Algorithmic pattern parameters
+  selectedPattern = $state("contours");
+  patternParams = $state<Record<string, Record<string, any>>>(buildDefaultParams());
 
   // Generative noise gradient parameters
   field = $state("flow");
@@ -65,6 +75,7 @@ class GeneratorStore {
 
   // Internal clock & render state
   #clock = 0;
+  #patternClock = 0;
   #lastTime = 0;
   #rafId = 0;
   #pending = false;
@@ -78,7 +89,11 @@ class GeneratorStore {
       document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
           this.stopAnimation();
-        } else if (this.animate && this.isOrganic && this.generatorMode === "noise") {
+        } else if (
+          this.animate &&
+          ((this.isOrganic && this.generatorMode === "noise") ||
+            (this.patternHasTime && this.generatorMode === "patterns"))
+        ) {
           this.startAnimation();
         }
       });
@@ -87,7 +102,16 @@ class GeneratorStore {
 
   hydrateFromURL(gen: GeneratorURLState) {
     if (gen.tool) this.generatorMode = gen.tool;
-    if (gen.tool === "noise") {
+    if (gen.tool === "patterns") {
+      if (gen.pattern) this.selectedPattern = gen.pattern;
+      if (gen.ratio) this.ratio = gen.ratio;
+      if (gen.patternParams) {
+        if (!this.patternParams[this.selectedPattern]) {
+          this.patternParams[this.selectedPattern] = {};
+        }
+        Object.assign(this.patternParams[this.selectedPattern], gen.patternParams);
+      }
+    } else if (gen.tool === "noise") {
       if (gen.field) this.field = gen.field;
       if (gen.style) this.style = gen.style;
       if (gen.texture) this.texture = gen.texture;
@@ -109,8 +133,15 @@ class GeneratorStore {
   }
 
   updateURL() {
-    if (ui.mode !== "generator") return;
-    if (this.generatorMode === "noise") {
+    if (ui.mode !== "generator" && ui.mode !== "pattern") return;
+    if (this.generatorMode === "patterns" || ui.mode === "pattern") {
+      writeGeneratorStateToURL({
+        tool: "patterns",
+        pattern: this.selectedPattern,
+        ratio: this.ratio,
+        patternParams: this.patternParams[this.selectedPattern],
+      });
+    } else if (this.generatorMode === "noise") {
       writeGeneratorStateToURL({
         tool: "noise",
         field: this.field,
@@ -142,6 +173,22 @@ class GeneratorStore {
   isOrganic = $derived(ORGANIC_TYPES.has(this.field.toLowerCase()));
   isAngled = $derived(ANGLED_TYPES.has(this.field.toLowerCase()));
 
+  currentPatternUI = $derived.by((): GeneratorUI => {
+    return generators.find((g) => g.name === this.selectedPattern) ?? generators[0];
+  });
+
+  currentPatternParams = $derived.by(() => {
+    return this.patternParams[this.selectedPattern] ?? {};
+  });
+
+  currentPatternPresets = $derived.by(() => {
+    return getPatternPresets(this.selectedPattern);
+  });
+
+  patternHasTime = $derived.by(() => {
+    return this.currentPatternUI.controls.some((c) => c.key === "time");
+  });
+
   aspectRatio = $derived.by(() => {
     const parts = this.ratio.split("/").map(Number);
     return (parts[0] || 16) / (parts[1] || 9);
@@ -155,6 +202,65 @@ class GeneratorStore {
   exportDimensions = $derived.by(() => {
     return calculateOutputDimensions(this.ratio, 1600);
   });
+
+  patternDimensions = $derived.by(() => {
+    const defW = this.currentPatternUI.defaultSize.width;
+    const defH = this.currentPatternUI.defaultSize.height;
+    const cap = ui.settings.previewMaxDim > 0 ? ui.settings.previewMaxDim : 720;
+    const scale = Math.min(1, cap / Math.max(defW, defH));
+    return {
+      w: Math.max(64, Math.round(defW * scale)),
+      h: Math.max(64, Math.round(defH * scale)),
+    };
+  });
+
+  patternExportDimensions = $derived.by(() => {
+    const defW = this.currentPatternUI.defaultSize.width;
+    const defH = this.currentPatternUI.defaultSize.height;
+    const target = 1600;
+    const scale = target / Math.max(defW, defH);
+    return {
+      w: Math.round(defW * scale),
+      h: Math.round(defH * scale),
+    };
+  });
+
+  selectPattern(name: string) {
+    this.selectedPattern = name;
+    this.ratio = name === "contours" || name === "flowfield" ? "16/10" : "1/1";
+    this.animate = false;
+    this.#patternClock = 0;
+    this.scheduleRender();
+    this.syncAnimation();
+  }
+
+  setPatternParam(key: string, val: any) {
+    if (!this.patternParams[this.selectedPattern]) {
+      this.patternParams[this.selectedPattern] = {};
+    }
+    this.patternParams[this.selectedPattern][key] = val;
+    this.scheduleRender();
+  }
+
+  rollPatternSeed() {
+    const p = this.patternParams[this.selectedPattern];
+    if (p && "seed" in p) {
+      p.seed = Math.floor(Math.random() * 1_000_000);
+      this.setStatus(`Nova semente: ${p.seed}`);
+      this.scheduleRender();
+    }
+  }
+
+  applyPatternPreset(preset: PatternPreset) {
+    this.selectedPattern = preset.pattern;
+    if (!this.patternParams[preset.pattern]) {
+      this.patternParams[preset.pattern] = {};
+    }
+    Object.assign(this.patternParams[preset.pattern], preset.params);
+    this.setStatus(`Preset aplicado: ${preset.name}`);
+    this.scheduleRender();
+    this.syncAnimation();
+  }
 
   cssOutput = $derived.by(() => {
     if (this.generatorMode === "multistop") {
@@ -299,24 +405,39 @@ class GeneratorStore {
 
   toggleAnimation() {
     this.animate = !this.animate;
+    if (!this.animate) {
+      this.#patternClock = 0;
+    }
     this.syncAnimation();
   }
 
   startAnimation() {
-    if (this.#rafId || !this.animate || !this.isOrganic || this.generatorMode !== "noise") return;
+    const canAnimate =
+      (this.generatorMode === "noise" && this.isOrganic) ||
+      (this.generatorMode === "patterns" && this.patternHasTime);
+    if (this.#rafId || !this.animate || !canAnimate) return;
     this.#lastTime = performance.now();
     const frame = async (now: number) => {
       this.#rafId = 0;
-      if (!this.animate || !this.isOrganic || this.generatorMode !== "noise" || (typeof document !== "undefined" && document.hidden)) {
+      const canLoop =
+        (this.generatorMode === "noise" && this.isOrganic) ||
+        (this.generatorMode === "patterns" && this.patternHasTime);
+      if (!this.animate || !canLoop || (typeof document !== "undefined" && document.hidden)) {
         return;
       }
       const delta = Math.min(0.1, (now - this.#lastTime) / 1000);
       this.#clock += delta;
       this.#lastTime = now;
+      if (this.generatorMode === "patterns" && this.patternHasTime) {
+        this.#patternClock += delta * 0.4;
+      }
       if (!this.#inFlight) {
         await this.renderFrame();
       }
-      if (this.animate && this.isOrganic && this.generatorMode === "noise" && !(typeof document !== "undefined" && document.hidden)) {
+      const stillActive =
+        (this.generatorMode === "noise" && this.isOrganic) ||
+        (this.generatorMode === "patterns" && this.patternHasTime);
+      if (this.animate && stillActive && !(typeof document !== "undefined" && document.hidden)) {
         this.#rafId = requestAnimationFrame(frame);
       }
     };
@@ -331,7 +452,10 @@ class GeneratorStore {
   }
 
   syncAnimation() {
-    if (this.animate && this.isOrganic && this.generatorMode === "noise") {
+    const canAnimate =
+      (this.generatorMode === "noise" && this.isOrganic) ||
+      (this.generatorMode === "patterns" && this.patternHasTime);
+    if (this.animate && canAnimate) {
       this.startAnimation();
     } else {
       this.stopAnimation();
@@ -409,7 +533,22 @@ class GeneratorStore {
       const canvas = refs.canvas;
       if (!canvas) return;
 
-      if (this.generatorMode === "noise") {
+      if (this.generatorMode === "patterns") {
+        const { w, h } = this.patternDimensions;
+        const raw = this.patternParams[this.selectedPattern] ?? {};
+        const params = { ...raw };
+        if (this.animate && this.patternHasTime && "time" in params) {
+          params.time = Number(((params.time ?? 0) + this.#patternClock).toFixed(3));
+        }
+        const img = await backend.renderGenerator(
+          this.selectedPattern,
+          params,
+          w,
+          h,
+        );
+        if (seq !== this.#drawSeq) return;
+        putImageData(canvas, img);
+      } else if (this.generatorMode === "noise") {
         const { w, h } = this.previewDimensions;
         const img = await backend.renderNoiseField(this.getNoiseParams(), w, h);
         if (seq !== this.#drawSeq) return;
@@ -462,15 +601,29 @@ class GeneratorStore {
     this.setStatus("Gerando PNG em alta resolução (1600px)...");
     try {
       const backend = await getBackend(ui.settings.backend);
-      const { w, h } = this.exportDimensions;
-
       let img: ImageData;
       let filename: string;
 
-      if (this.generatorMode === "noise") {
+      if (this.generatorMode === "patterns") {
+        const { w, h } = this.patternExportDimensions;
+        const raw = this.patternParams[this.selectedPattern] ?? {};
+        const params = { ...raw };
+        if (this.animate && this.patternHasTime && "time" in params) {
+          params.time = Number(((params.time ?? 0) + this.#patternClock).toFixed(3));
+        }
+        img = await backend.renderGenerator(
+          this.selectedPattern,
+          params,
+          w,
+          h,
+        );
+        filename = `bitbrush-${this.selectedPattern}-${w}x${h}.png`;
+      } else if (this.generatorMode === "noise") {
+        const { w, h } = this.exportDimensions;
         img = await backend.renderNoiseField(this.getNoiseParams(), w, h);
         filename = `bitbrush-gradient-${this.field}-${this.style}-${this.texture}-${w}x${h}.png`;
       } else {
+        const { w, h } = this.exportDimensions;
         img = await backend.renderGradient(this.getGradientParams(w, h));
         filename = `bitbrush-gradient-perceptual-${w}x${h}.png`;
       }
@@ -494,7 +647,7 @@ class GeneratorStore {
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(url), 10_000);
-        this.setStatus(`PNG ${w}×${h} px salvo com sucesso!`);
+        this.setStatus(`PNG ${img.width}×${img.height} px salvo com sucesso!`);
       }, "image/png");
     } catch (err) {
       console.error(err);

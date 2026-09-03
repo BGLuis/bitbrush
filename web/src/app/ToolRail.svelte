@@ -1,6 +1,8 @@
 <script lang="ts">
   import { effects } from "../ui/controls";
-  import { ui, selectEffect, selectGenerator } from "./store.svelte";
+  import { generators } from "../ui/generators";
+  import { ui, selectEffect, selectPatternTool, selectGenerator } from "./store.svelte";
+  import { generatorStore } from "./generator/generator-store.svelte";
 </script>
 
 {#snippet ico(name: string)}
@@ -23,6 +25,30 @@
   {/if}
 {/snippet}
 
+{#snippet patternIco(name: string)}
+  {#if name === "contours"}
+    <svg viewBox="0 0 24 24"><path d="M3 8c4-3 14-3 18 0M3 13c4-3 14-3 18 0M3 18c4-3 14-3 18 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+  {:else if name === "flowfield"}
+    <svg viewBox="0 0 24 24"><path d="M3 17c5-1 9-8 18-5M3 12c5-1 7-4 13-3s4 4 2 6M3 7c8 0 11-4 18-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+  {:else if name === "chladni"}
+    <svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M6 6c6 2 6 10 0 12M18 6c-6 2-6 10 0 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg>
+  {:else if name === "reactiondiffusion"}
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="3" fill="none" stroke="currentColor" stroke-width="1.7" /><rect x="13" y="11" width="7" height="9" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.7" /><circle cx="7" cy="17" r="2.8" fill="none" stroke="currentColor" stroke-width="1.7" /><circle cx="16" cy="6" r="2.3" fill="none" stroke="currentColor" stroke-width="1.7" /></svg>
+  {:else if name === "truchet"}
+    <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 8-8M12 20a8 8 0 0 1 8-8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+  {:else if name === "harmonograph"}
+    <svg viewBox="0 0 24 24"><path d="M5 12c0-5 3-8 7-8s7 3 7 8-3 8-7 8-7-3-7-8zm2-3c2-4 6-4 8 0s-2 10-4 10-6-6-4-10z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /></svg>
+  {:else if name === "attractor"}
+    <svg viewBox="0 0 24 24"><path d="M12 12c-4-6-8-4-8 0s5 6 8 0c3-6 7-4 8 0s-4 6-8 0z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" /></svg>
+  {:else if name === "lsystem"}
+    <svg viewBox="0 0 24 24"><path d="M12 21v-8m0 0l-5-4m5 4l5-4m-8-2l-3-3m3 3l3-3m5 2l3-3m-3 3l-3-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+  {:else if name === "flame"}
+    <svg viewBox="0 0 24 24"><path d="M12 3v3m0 12v3M3 12h3m12 0h3m-3.5-5.5l-2.1 2.1m-8.8 8.8l-2.1 2.1m0-13l2.1 2.1m8.8 8.8l2.1 2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+  {:else}
+    <svg viewBox="0 0 24 24"><path d="M2 12c3-4 6-4 9 0s6 4 9 0M2 7c3-4 6-4 9 0s6 4 9 0" fill="none" stroke="currentColor" stroke-width="1.8" /></svg>
+  {/if}
+{/snippet}
+
 <nav class="rail">
   <h4>Filtros</h4>
   {#each effects as e (e.name)}
@@ -33,6 +59,19 @@
     >
       {@render ico(e.name)}
       <span>{e.title}</span>
+    </button>
+  {/each}
+
+  <div class="sep"></div>
+  <h4>Padrões</h4>
+  {#each generators as g (g.name)}
+    <button
+      class="tool"
+      class:on={ui.mode === "pattern" && generatorStore.selectedPattern === g.name}
+      onclick={() => selectPatternTool(g.name)}
+    >
+      {@render patternIco(g.name)}
+      <span>{g.title}</span>
     </button>
   {/each}
 

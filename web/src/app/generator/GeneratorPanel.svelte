@@ -59,7 +59,7 @@
         generatorStore.syncAnimation();
       }}
     >
-      Gradiente Generativo (Ruído)
+      Ruído
     </button>
     <button
       type="button"
@@ -71,7 +71,7 @@
         generatorStore.scheduleRender();
       }}
     >
-      Perceptual / CSS
+      CSS
     </button>
   </div>
 
@@ -499,7 +499,7 @@
           {generatorStore.copiedCSS ? "✓ Copiado!" : "Copiar CSS"}
         </button>
       </div>
-      <div class="css-box">
+        <div class="css-box">
         <textarea readonly spellcheck="false" rows="5" value={generatorStore.cssOutput}></textarea>
       </div>
     </section>

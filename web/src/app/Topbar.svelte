@@ -13,6 +13,9 @@
   let exportLabel = $state("Exportar PNG");
 
   const recipe = $derived.by(() => {
+    if (ui.mode === "pattern") {
+      return `padrão · ${generatorStore.currentPatternUI?.title.toLowerCase() ?? "algorítmico"}`;
+    }
     if (ui.mode === "generator") return "gerador · gradiente / ruído";
     if (ui.mode === "palette") return "gerador · paleta";
     const bits = Object.entries(ui.params)
@@ -50,7 +53,7 @@
   }
 
   async function exportPng() {
-    if (ui.mode === "generator") {
+    if (ui.mode === "generator" || ui.mode === "pattern") {
       void generatorStore.exportHighResPNG();
       return;
     }

@@ -10,7 +10,7 @@ import { readSettings, type Settings } from "../settings";
 import type { FilterParams } from "../wasm";
 import { generatorStore } from "./generator/generator-store.svelte";
 
-export type Mode = "filter" | "generator" | "palette";
+export type Mode = "filter" | "pattern" | "generator" | "palette";
 
 export function effectByName(name: string): EffectUI | undefined {
   return effects.find((e) => e.name === name);
@@ -57,8 +57,21 @@ export function selectEffect(name: string): void {
   ui.params = defaultParams(name);
 }
 
+export function selectPatternTool(name: string): void {
+  ui.mode = "pattern";
+  generatorStore.generatorMode = "patterns";
+  generatorStore.selectPattern(name);
+  generatorStore.scheduleRender();
+  generatorStore.syncAnimation();
+}
+
 export function selectGenerator(mode: "generator" | "palette"): void {
   ui.mode = mode;
+  if (mode === "generator" && generatorStore.generatorMode === "patterns") {
+    generatorStore.generatorMode = "noise";
+  }
+  generatorStore.scheduleRender();
+  generatorStore.syncAnimation();
 }
 
 export function resetParams(): void {

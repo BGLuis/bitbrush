@@ -27,7 +27,7 @@
       const canvas = refs.canvas;
       if (!src || !canvas) return;
       scheduleFilterRender({ canvas, name, src, params, pref });
-    } else if (ui.mode === "generator") {
+    } else if (ui.mode === "generator" || ui.mode === "pattern") {
       generatorStore.scheduleRender();
       generatorStore.syncAnimation();
     } else {
