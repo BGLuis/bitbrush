@@ -29,6 +29,14 @@
   // Progress / Status
   let isGenerating = $state(false);
   let statusText = $state("");
+  let statusType = $state<"loading" | "success" | "error" | null>(null);
+  let errorMessage = $state("");
+
+  function dismissFeedback() {
+    statusType = null;
+    statusText = "";
+    errorMessage = "";
+  }
 
   // Inspectable parameters for the current mode
   const currentFilterControls = $derived.by(() => {
@@ -144,11 +152,18 @@
     kfA = null;
     kfB = null;
     statusText = "";
+    statusType = null;
+    errorMessage = "";
   }
 
   async function generateGif() {
     isGenerating = true;
+    statusType = "loading";
     statusText = "Iniciando renderização do GIF...";
+    errorMessage = "";
+    if (ui.mode === "generator") {
+      generatorStore.setStatus("Iniciando renderização do GIF animado...");
+    }
 
     try {
       const backend = await getBackend(ui.settings.backend);
@@ -166,7 +181,9 @@
       if (ui.mode === "filter") {
         const src = ui.original ?? ui.preview;
         if (!src) {
+          statusType = "error";
           statusText = "Carregue uma imagem antes de gerar o GIF.";
+          errorMessage = "Nenhuma imagem está disponível para aplicar os filtros e gerar a animação.";
           isGenerating = false;
           return;
         }
@@ -185,7 +202,7 @@
           }
 
           if (animateSeed && ("seed" in a || "seed" in b)) {
-            const base = Number(a.seed ?? 0);
+            const base = Math.round(Number(a.seed ?? 0));
             a = { ...a, seed: base };
             b = { ...b, seed: base + opt.frames - 1 };
           }
@@ -198,7 +215,7 @@
           let a = { ...(kfA ?? ui.params) };
           let b = { ...(kfB ?? ui.params) };
           if (animateSeed && ("seed" in a || "seed" in b)) {
-            const base = Number(a.seed ?? 0);
+            const base = Math.round(Number(a.seed ?? 0));
             a = { ...a, seed: base };
             b = { ...b, seed: base + opt.frames - 1 };
           }
@@ -214,12 +231,15 @@
       } else {
         // Generator Mode (NoiseField / Multi-stop)
         statusText = `Renderizando ${opt.frames} quadros do gradiente generativo...`;
+        if (ui.mode === "generator") {
+          generatorStore.setStatus(`Renderizando ${opt.frames} quadros do gradiente...`);
+        }
 
         const { w, h } = calculateOutputDimensions(generatorStore.ratio, maxDim);
         const baseNoise = generatorStore.getNoiseParams();
 
-        let startP: NoiseFieldParams = { ...baseNoise };
-        let endP: NoiseFieldParams = { ...baseNoise };
+        let startP: NoiseFieldParams = { ...baseNoise, seed: Math.round(baseNoise.seed || 0) };
+        let endP: NoiseFieldParams = { ...baseNoise, seed: Math.round(baseNoise.seed || 0) };
 
         if (selectedParam === "time") {
           startP.time = startVal;
@@ -234,8 +254,8 @@
           startP.scale = startVal;
           endP.scale = endVal;
         } else if (selectedParam === "seed") {
-          startP.seed = startVal;
-          endP.seed = endVal;
+          startP.seed = Math.round(startVal);
+          endP.seed = Math.round(endVal);
         }
 
         bytes = await backend.renderNoiseFieldGIF(startP, endP, w, h, opt);
@@ -256,10 +276,21 @@
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 15_000);
 
-      statusText = `✓ GIF pronto! ${(bytes.length / 1024).toFixed(0)} KB · ${opt.frames} quadros a ${opt.fps} FPS`;
+      const kb = (bytes.length / 1024).toFixed(0);
+      statusType = "success";
+      statusText = `✓ GIF baixado com sucesso! ${kb} KB · ${opt.frames} quadros a ${opt.fps} FPS`;
+      if (ui.mode === "generator") {
+        generatorStore.setStatus(`GIF animado baixado com sucesso (${kb} KB)!`);
+      }
     } catch (err) {
       console.error("Erro na geração do GIF:", err);
-      statusText = `Falha ao gerar GIF: ${String(err)}`;
+      statusType = "error";
+      const errMsg = err instanceof Error ? err.message : String(err);
+      statusText = "Falha ao gerar GIF";
+      errorMessage = errMsg;
+      if (ui.mode === "generator") {
+        generatorStore.setStatus(`Erro ao gerar GIF: ${errMsg}`);
+      }
     } finally {
       isGenerating = false;
     }
@@ -277,7 +308,17 @@
       <span>Exportar GIF Animado {ui.mode === "generator" ? "· Gradiente" : `· ${effectByName(ui.effectName)?.title ?? ui.effectName}`}</span>
     </div>
     {#if statusText}
-      <span class="pill-status">{statusText}</span>
+      <span
+        class="pill-status"
+        class:loading={isGenerating}
+        class:success={statusType === 'success'}
+        class:error={statusType === 'error'}
+      >
+        {#if isGenerating}
+          <span class="pill-dot"></span>
+        {/if}
+        {statusText}
+      </span>
     {/if}
   </summary>
 
@@ -442,19 +483,74 @@
       {/if}
     </div>
 
-    <!-- Action Bar -->
-    <div class="action-row">
-      <button
-        type="button"
-        class="gif-generate-btn"
-        disabled={isGenerating}
-        onclick={generateGif}
-      >
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="5 3 19 12 5 21 5 3" />
-        </svg>
-        {isGenerating ? "Gerando GIF Animado..." : "Gerar e Baixar GIF"}
-      </button>
+    <!-- Action Section -->
+    <div class="action-section">
+      {#if statusType}
+        <div class="gif-feedback {statusType}" role="alert">
+          <div class="feedback-icon">
+            {#if statusType === "loading"}
+              <svg class="spin" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-linecap="round" />
+              </svg>
+            {:else if statusType === "error"}
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            {:else if statusType === "success"}
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 6L9 17l-5-5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            {/if}
+          </div>
+          <div class="feedback-body">
+            <div class="feedback-title">
+              {statusType === "loading"
+                ? "Processando animação..."
+                : statusType === "success"
+                  ? "Download iniciado!"
+                  : "Falha ao gerar GIF"}
+            </div>
+            <div class="feedback-detail">
+              {statusType === "error" && errorMessage ? errorMessage : statusText}
+            </div>
+          </div>
+          {#if statusType !== "loading"}
+            <button
+              type="button"
+              class="feedback-close-btn"
+              title="Fechar aviso"
+              onclick={dismissFeedback}
+            >
+              ✕
+            </button>
+          {/if}
+        </div>
+      {/if}
+
+      <div class="action-row">
+        <button
+          type="button"
+          class="gif-generate-btn"
+          disabled={isGenerating}
+          onclick={generateGif}
+        >
+          {#if isGenerating}
+            <svg class="spin" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-linecap="round" />
+            </svg>
+            <span>Gerando GIF Animado...</span>
+          {:else}
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            <span>Gerar e Baixar GIF</span>
+          {/if}
+        </button>
+      </div>
     </div>
   </div>
 </details>
@@ -485,6 +581,9 @@
     color: var(--accent);
   }
   .pill-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 11px;
     font-family: var(--mono);
     color: var(--dim);
@@ -492,6 +591,33 @@
     padding: 3px 8px;
     border-radius: 999px;
     border: 1px solid var(--line);
+    transition: all 0.2s ease;
+  }
+  .pill-status.loading {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--tint);
+  }
+  .pill-status.success {
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.4);
+    background: rgba(34, 197, 94, 0.1);
+  }
+  .pill-status.error {
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.12);
+  }
+  .pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse-dot 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
   }
   .control-panel {
     margin-top: 12px;
@@ -637,6 +763,103 @@
     cursor: pointer;
     font-size: 11.5px;
     color: var(--text);
+  }
+  .action-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .gif-feedback {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    border: 1px solid transparent;
+    animation: fadeIn 0.15s ease-out;
+  }
+  .gif-feedback.loading {
+    background: var(--tint);
+    border-color: var(--accent);
+    color: var(--text);
+  }
+  .gif-feedback.loading .feedback-icon {
+    color: var(--accent);
+  }
+  .gif-feedback.success {
+    background: rgba(34, 197, 94, 0.1);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #86efac;
+  }
+  .gif-feedback.success .feedback-title {
+    color: #4ade80;
+  }
+  .gif-feedback.success .feedback-detail {
+    color: #bbf7d0;
+  }
+  .gif-feedback.error {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+  }
+  .gif-feedback.error .feedback-title {
+    color: #f87171;
+  }
+  .gif-feedback.error .feedback-detail {
+    color: #fecaca;
+    word-break: break-word;
+    font-family: var(--mono);
+    font-size: 11px;
+  }
+  .feedback-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .feedback-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+  .feedback-title {
+    font-weight: 600;
+    font-size: 12px;
+  }
+  .feedback-detail {
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+  .feedback-close-btn {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    opacity: 0.65;
+    cursor: pointer;
+    font-size: 12px;
+    padding: 0 4px;
+    line-height: 1;
+    border-radius: 4px;
+    transition: opacity 0.15s ease;
+  }
+  .feedback-close-btn:hover {
+    opacity: 1;
+  }
+  .spin {
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   .action-row {
     display: flex;

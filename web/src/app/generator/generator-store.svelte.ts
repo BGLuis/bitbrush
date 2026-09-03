@@ -49,7 +49,7 @@ class GeneratorStore {
   direction = $state(135);
   scale = $state(50);
   distortion = $state(55);
-  seed = $state(7.3);
+  seed = $state(0);
   animate = $state(!reduceMotion);
   ratio = $state("16/9");
   colors = $state<string[]>([...PRESETS[0].colors]);
@@ -320,7 +320,7 @@ class GeneratorStore {
     this.spots = defaultSpots(preset.colors.length);
     this.scale = 50;
     this.distortion = 55;
-    this.seed = 7.3;
+    this.seed = 0;
     this.scheduleRender();
     this.syncAnimation();
   }
@@ -488,13 +488,13 @@ class GeneratorStore {
       spots: isOrganic
         ? cleanColors.map((c, i) => {
             const sp = this.spots[i] ?? [0.5, 0.5];
-            return { color: c, x: sp[0], y: sp[1] };
+            return { color: c, x: sp[0], y: 1.0 - sp[1] };
           })
         : [],
       angle: this.direction,
       scale: this.scale,
       distortion: this.distortion,
-      seed: this.seed,
+      seed: Math.round(this.seed),
       time: clockTime !== undefined ? clockTime : this.#clock,
     };
   }

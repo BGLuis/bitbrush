@@ -67,7 +67,10 @@ export function readStateFromURL(): URLState {
       if (q.has("deg")) genState.angle = Number(q.get("deg")) || 0;
       if (q.has("scale")) genState.scale = Number(q.get("scale")) || 50;
       if (q.has("dist")) genState.distortion = Number(q.get("dist")) || 55;
-      if (q.has("seed")) genState.seed = Number(q.get("seed")) || 7.3;
+      if (q.has("seed")) {
+        const s = Number(q.get("seed"));
+        genState.seed = Number.isFinite(s) ? Math.round(s) : 0;
+      }
       if (q.has("ar")) genState.ratio = q.get("ar")!;
       if (q.has("cols")) {
         genState.colors = q

@@ -229,7 +229,8 @@ export function gradientCSS(params: GradientParams, options: GradientCSSOptions)
 }
 
 export function renderNoiseField(params: NoiseFieldParams, w: number, h: number): ImageData {
-  const res = bitbrushRenderNoiseField(JSON.stringify(params), w, h);
+  const safe = { ...params, seed: Math.round(params.seed || 0) };
+  const res = bitbrushRenderNoiseField(JSON.stringify(safe), w, h);
   if (!res.ok || !res.data) throw new Error(res.error || "noise field render failed");
   return new ImageData(new Uint8ClampedArray(res.data), w, h);
 }
@@ -241,9 +242,11 @@ export function renderNoiseFieldGIF(
   h: number,
   options: GifOptions,
 ): Uint8Array {
+  const safeStart = { ...start, seed: Math.round(start.seed || 0) };
+  const safeEnd = { ...end, seed: Math.round(end.seed || 0) };
   const res = bitbrushRenderNoiseFieldGIF(
-    JSON.stringify(start),
-    JSON.stringify(end),
+    JSON.stringify(safeStart),
+    JSON.stringify(safeEnd),
     w,
     h,
     JSON.stringify(options),

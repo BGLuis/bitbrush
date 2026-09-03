@@ -254,10 +254,8 @@ export function colorName(hex: string): string {
 }
 
 export function sanitizeColors(list: string[]): string[] {
-  const out = list
-    .filter((v) => HEX_REGEX.test(String(v).trim()))
-    .map((v) => v.trim().toUpperCase());
-  return out.length ? out : ["#888888", "#CCCCCC"];
+  if (!list.length) return ["#888888", "#CCCCCC"];
+  return list.map((v) => (HEX_REGEX.test(String(v).trim()) ? v.trim().toUpperCase() : "#888888"));
 }
 
 export function stopsFrom(genre: string, list: string[]): string[] {

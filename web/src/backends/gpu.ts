@@ -346,7 +346,8 @@ class GpuBackend implements FilterBackend {
     this.#renderNoisePass(params, w, h, this.#fbo);
     const out = new Uint8Array(w * h * 4);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, out);
-    return new ImageData(new Uint8ClampedArray(out.buffer), w, h);
+    const flipped = flipImageDataY(out, w, h);
+    return new ImageData(flipped, w, h);
   }
 
   #renderNoisePass(
@@ -443,6 +444,18 @@ function linkProgram(gl: WebGL2RenderingContext, vertSrc: string, fragSrc: strin
     throw new Error(`program link failed: ${log}`);
   }
   return prog;
+}
+
+function flipImageDataY(data: Uint8Array, w: number, h: number): Uint8ClampedArray<ArrayBuffer> {
+  const stride = w * 4;
+  const buf = new ArrayBuffer(data.length);
+  const flipped = new Uint8ClampedArray(buf);
+  for (let y = 0; y < h; y++) {
+    const srcRow = (h - 1 - y) * stride;
+    const dstRow = y * stride;
+    flipped.set(data.subarray(srcRow, srcRow + stride), dstRow);
+  }
+  return flipped;
 }
 
 registerBackend("gpu", () => new GpuBackend());

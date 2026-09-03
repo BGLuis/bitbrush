@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"syscall/js"
 
 	"bitbrush/internal/anim"
@@ -148,7 +149,7 @@ func parseNoiseFieldParams(jsonStr string) (noisefield.Params, error) {
 		Angle      float64 `json:"angle"`
 		Scale      float64 `json:"scale"`
 		Distortion float64 `json:"distortion"`
-		Seed       int64   `json:"seed"`
+		Seed       float64 `json:"seed"`
 		Time       float64 `json:"time"`
 	}
 	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil {
@@ -181,7 +182,7 @@ func parseNoiseFieldParams(jsonStr string) (noisefield.Params, error) {
 		AngleDeg:   p.Angle,
 		Scale:      p.Scale,
 		Distortion: p.Distortion,
-		Seed:       p.Seed,
+		Seed:       int64(math.Round(p.Seed)),
 		Time:       p.Time,
 	}, nil
 }
@@ -293,12 +294,12 @@ func extractPalette(_ js.Value, args []js.Value) (result any) {
 	}
 
 	var o struct {
-		Count          int    `json:"count"`
-		Method         string `json:"method"`
-		Space          string `json:"space"`
-		Sort           string `json:"sort"`
-		AlphaThreshold int    `json:"alphaThreshold"`
-		Seed           int64  `json:"seed"`
+		Count          int     `json:"count"`
+		Method         string  `json:"method"`
+		Space          string  `json:"space"`
+		Sort           string  `json:"sort"`
+		AlphaThreshold int     `json:"alphaThreshold"`
+		Seed           float64 `json:"seed"`
 	}
 	if err := json.Unmarshal([]byte(args[3].String()), &o); err != nil {
 		return map[string]any{"ok": false, "colors": nil, "error": fmt.Sprintf("bad options: %v", err)}
@@ -328,7 +329,7 @@ func extractPalette(_ js.Value, args []js.Value) (result any) {
 		Space:          space,
 		Sort:           sortKey,
 		AlphaThreshold: uint8(o.AlphaThreshold),
-		Seed:           o.Seed,
+		Seed:           int64(math.Round(o.Seed)),
 	})
 	return map[string]any{"ok": true, "colors": hexList(cols), "error": ""}
 }
