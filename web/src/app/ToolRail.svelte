@@ -8,12 +8,22 @@
 {#snippet ico(name: string)}
   {#if name === "pixelate"}
     <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" /><rect x="13.5" y="3.5" width="7" height="7" /><rect x="3.5" y="13.5" width="7" height="7" /><rect x="13.5" y="13.5" width="7" height="7" /></svg>
+  {:else if name === "grayscale"}
+    <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="1.5" /><path d="M9.3 5v14M14.6 5v14" /><path d="M4 5h5.3v14H4z" fill="currentColor" stroke="none" /></svg>
+  {:else if name === "paper"}
+    <svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12h6M9 15h6M9 18h4" /></svg>
+  {:else if name === "pencil"}
+    <svg viewBox="0 0 24 24"><path d="M4 20l2-6L16 4l4 4L10 18z" /><path d="M14 6l4 4M4 20l6-2" /></svg>
   {:else if name === "sobel"}
     <svg viewBox="0 0 24 24"><path d="M4 20 20 4M4 20V9M4 20h11" /></svg>
   {:else if name === "quantize"}
     <svg viewBox="0 0 24 24"><path d="M4 19h4v-8H4zM10 19h4V6h-4zM16 19h4v-5h-4z" /></svg>
   {:else if name === "dither"}
     <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="1.3" /><circle cx="12" cy="7" r="1.3" /><circle cx="18" cy="6" r="1.3" /><circle cx="7" cy="13" r="1.3" /><circle cx="14" cy="14" r="1.3" /><circle cx="9" cy="19" r="1.3" /><circle cx="19" cy="18" r="1.3" /></svg>
+  {:else if name === "halftone"}
+    <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="11" cy="12" r="1.9" fill="currentColor" stroke="none" /><circle cx="17.5" cy="12" r="3.2" fill="currentColor" stroke="none" /></svg>
+  {:else if name === "stipple"}
+    <svg viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><circle cx="5" cy="6" r="1" /><circle cx="8" cy="10" r="1" /><circle cx="5" cy="13" r="1" /><circle cx="9" cy="15" r="1" /><circle cx="6" cy="19" r="1" /><circle cx="12" cy="7" r="1" /><circle cx="13" cy="13" r="1" /><circle cx="12" cy="19" r="1" /><circle cx="17" cy="10" r="1" /><circle cx="18" cy="17" r="1" /></g></svg>
   {:else if name === "glitch"}
     <svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="4" /><rect x="8" y="14" width="13" height="4" /></svg>
   {:else if name === "ascii"}

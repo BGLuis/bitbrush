@@ -48,6 +48,18 @@ func blockAverage(src *image.RGBA, x0, y0, w, h int) color.RGBA {
 	}
 }
 
+// clampF saturates v into [lo,hi].
+func clampF(v, lo, hi float64) float64 {
+	switch {
+	case v < lo:
+		return lo
+	case v > hi:
+		return hi
+	default:
+		return v
+	}
+}
+
 // clampInt saturates v into [lo,hi].
 func clampInt(v, lo, hi int) int {
 	switch {

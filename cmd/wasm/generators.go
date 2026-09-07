@@ -31,7 +31,7 @@ func registerGenerators() {
 }
 
 func okData(pix []byte) map[string]any {
-	dst := js.Global().Get("Uint8Array").New(len(pix))
+	dst := uint8Array.New(len(pix))
 	js.CopyBytesToJS(dst, pix)
 	return map[string]any{"ok": true, "data": dst, "error": ""}
 }
@@ -247,7 +247,7 @@ func renderNoiseFieldGIF(_ js.Value, args []js.Value) (result any) {
 		return errData(err)
 	}
 
-	dst := js.Global().Get("Uint8Array").New(len(data))
+	dst := uint8Array.New(len(data))
 	js.CopyBytesToJS(dst, data)
 	return map[string]any{"ok": true, "data": dst, "error": ""}
 }

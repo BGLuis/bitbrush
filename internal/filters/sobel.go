@@ -28,8 +28,57 @@ func Sobel(src *image.RGBA, p Params) (*image.RGBA, error) {
 	if w == 0 || h == 0 {
 		return dst, nil
 	}
+	b := src.Bounds()
 
-	// Clamped access to the luma plane (border replication).
+	// Squared cut in raw-magnitude space, so the thresholded path never calls
+	// math.Sqrt. mag_out >= threshold  <=>  mag_raw^2 >= thr2.
+	var thr2 float64
+	if threshold > 0 {
+		t := threshold
+		if normalize {
+			t = threshold * sobelMaxMag / 255
+		}
+		thr2 = t * t
+	}
+
+	resolve := func(gx, gy float64) uint8 {
+		var v uint8
+		if threshold > 0 {
+			if gx*gx+gy*gy >= thr2 {
+				v = 255
+			}
+		} else {
+			mag := math.Sqrt(gx*gx + gy*gy)
+			if normalize {
+				mag = mag * 255 / sobelMaxMag
+			}
+			v = clampU8(mag)
+		}
+		if invert {
+			v = 255 - v
+		}
+		return v
+	}
+	put := func(x, y int, v uint8) {
+		si := src.PixOffset(b.Min.X+x, b.Min.Y+y)
+		di := dst.PixOffset(x, y)
+		dst.Pix[di], dst.Pix[di+1], dst.Pix[di+2], dst.Pix[di+3] = v, v, v, src.Pix[si+3]
+	}
+
+	// Interior: direct plane indexing, no per-tap bounds checks.
+	for y := 1; y < h-1; y++ {
+		r0, r1, r2 := (y-1)*w, y*w, (y+1)*w
+		for x := 1; x < w-1; x++ {
+			tl, tc, tr := plane[r0+x-1], plane[r0+x], plane[r0+x+1]
+			ml, mr := plane[r1+x-1], plane[r1+x+1]
+			bl, bc, br := plane[r2+x-1], plane[r2+x], plane[r2+x+1]
+			gx := (tr - tl) + 2*(mr-ml) + (br - bl)
+			gy := (bl - tl) + 2*(bc-tc) + (br - tr)
+			put(x, y, resolve(gx, gy))
+		}
+	}
+
+	// Border ring: replicate edges.
 	at := func(x, y int) float64 {
 		if x < 0 {
 			x = 0
@@ -43,39 +92,24 @@ func Sobel(src *image.RGBA, p Params) (*image.RGBA, error) {
 		}
 		return plane[y*w+x]
 	}
-
-	b := src.Bounds()
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			tl, tc, tr := at(x-1, y-1), at(x, y-1), at(x+1, y-1)
-			ml, mr := at(x-1, y), at(x+1, y)
-			bl, bc, br := at(x-1, y+1), at(x, y+1), at(x+1, y+1)
-
-			gx := (tr - tl) + 2*(mr-ml) + (br - bl)
-			gy := (bl - tl) + 2*(bc-tc) + (br - tr)
-			mag := math.Sqrt(gx*gx + gy*gy)
-			if normalize {
-				mag = mag * 255 / sobelMaxMag
-			}
-
-			var v uint8
-			if threshold > 0 {
-				if mag >= threshold {
-					v = 255
-				}
-			} else {
-				v = clampU8(mag)
-			}
-			if invert {
-				v = 255 - v
-			}
-
-			si := src.PixOffset(b.Min.X+x, b.Min.Y+y)
-			di := dst.PixOffset(x, y)
-			dst.Pix[di] = v
-			dst.Pix[di+1] = v
-			dst.Pix[di+2] = v
-			dst.Pix[di+3] = src.Pix[si+3]
+	edge := func(x, y int) {
+		tl, tc, tr := at(x-1, y-1), at(x, y-1), at(x+1, y-1)
+		ml, mr := at(x-1, y), at(x+1, y)
+		bl, bc, br := at(x-1, y+1), at(x, y+1), at(x+1, y+1)
+		gx := (tr - tl) + 2*(mr-ml) + (br - bl)
+		gy := (bl - tl) + 2*(bc-tc) + (br - tr)
+		put(x, y, resolve(gx, gy))
+	}
+	for x := 0; x < w; x++ {
+		edge(x, 0)
+		if h > 1 {
+			edge(x, h-1)
+		}
+	}
+	for y := 1; y < h-1; y++ {
+		edge(0, y)
+		if w > 1 {
+			edge(w-1, y)
 		}
 	}
 	return dst, nil

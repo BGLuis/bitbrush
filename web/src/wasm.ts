@@ -168,7 +168,7 @@ export function applyFilter(
 ): ImageData {
   const res = bitbrushApplyFilter(
     name,
-    new Uint8Array(img.data.buffer.slice(0)),
+    new Uint8Array(img.data.buffer, img.data.byteOffset, img.data.byteLength),
     img.width,
     img.height,
     JSON.stringify(params),
@@ -183,7 +183,7 @@ export function applyFilter(
 // filter's "copy as text" export) instead of pixels.
 export function asciiText(img: ImageData, params: FilterParams = {}): string {
   const res = bitbrushAsciiText(
-    new Uint8Array(img.data.buffer.slice(0)),
+    new Uint8Array(img.data.buffer, img.data.byteOffset, img.data.byteLength),
     img.width,
     img.height,
     JSON.stringify(params),
@@ -204,7 +204,7 @@ export function renderGIF(
 ): Uint8Array {
   const res = bitbrushRenderGIF(
     name,
-    new Uint8Array(img.data.buffer.slice(0)),
+    new Uint8Array(img.data.buffer, img.data.byteOffset, img.data.byteLength),
     img.width,
     img.height,
     JSON.stringify(keyframes),
@@ -275,7 +275,7 @@ export function renderGenerator(
 
 export function extractPalette(img: ImageData, options: PaletteExtractOptions): string[] {
   const res = bitbrushExtractPalette(
-    new Uint8Array(img.data.buffer.slice(0)),
+    new Uint8Array(img.data.buffer, img.data.byteOffset, img.data.byteLength),
     img.width,
     img.height,
     JSON.stringify(options),

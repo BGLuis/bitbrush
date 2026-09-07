@@ -111,3 +111,27 @@ func TestHalftoneShapes(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkHalftoneMono1080p(b *testing.B) {
+	src := gradientImg(1920, 1080)
+	p := Params{"cellSize": 6.0}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if _, err := Apply("halftone", src, p); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkHalftoneCMYK1080p(b *testing.B) {
+	src := gradientImg(1920, 1080)
+	p := Params{"cellSize": 6.0, "channels": "cmyk"}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if _, err := Apply("halftone", src, p); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

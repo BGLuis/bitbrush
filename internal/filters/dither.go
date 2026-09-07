@@ -86,7 +86,7 @@ func ditherLevels(src, dst *image.RGBA, w, h int, serpentine bool, p Params) (*i
 	// RGB cube: black, the 3 primaries, the 3 secondaries, white).
 	plane := readVec3Plane(src, w, h)
 	diffuse3(plane, w, h, serpentine, k, func(v vec3) vec3 {
-		return vec3{quant(v[0]), quant(v[1]), quant(v[2])}
+		return vec3{q32(quant, v[0]), q32(quant, v[1]), q32(quant, v[2])}
 	})
 	writeVec3Plane(dst, src, plane, w, h)
 	return dst, nil
@@ -117,8 +117,8 @@ func ditherPalette(src, dst *image.RGBA, w, h int, serpentine bool, p Params) (*
 	// the independent per-channel case above.
 	plane := readVec3Plane(src, w, h)
 	diffuse3(plane, w, h, serpentine, k, func(v vec3) vec3 {
-		out := mapper.At(palette.RGB{R: clampU8(v[0]), G: clampU8(v[1]), B: clampU8(v[2])})
-		return vec3{float64(out.R), float64(out.G), float64(out.B)}
+		out := mapper.At(palette.RGB{R: clampU8(float64(v[0])), G: clampU8(float64(v[1])), B: clampU8(float64(v[2]))})
+		return vec3{float32(out.R), float32(out.G), float32(out.B)}
 	})
 	writeVec3Plane(dst, src, plane, w, h)
 	return dst, nil
@@ -131,16 +131,18 @@ func ditherOrdered(src, dst *image.RGBA, w, h int, p Params) (*image.RGBA, error
 	levels := clampLevels(p.Int("levels", 2))
 	quant := levelQuant(levels)
 	n := bayerSize(p.String("matrix", "4"))
-	m := bayerMatrix(n)
+	m := bayerMatrix(n) // flat n*n, row-major
+	mask := n - 1       // n is 2/4/8, so x%n == x&mask
 	// Spread one quantisation step across the matrix's [-0.5, 0.5) range.
 	amp := 255.0 / float64(levels-1)
 
 	if p.Bool("grayscale", true) {
 		plane, _, _ := lumaPlane(src)
 		for y := 0; y < h; y++ {
+			mr := (y & mask) * n
+			row := y * w
 			for x := 0; x < w; x++ {
-				i := y*w + x
-				plane[i] = quant(plane[i] + (m[y%n][x%n]-0.5)*amp)
+				plane[row+x] = quant(plane[row+x] + (m[mr+(x&mask)]-0.5)*amp)
 			}
 		}
 		writeGrayPlane(dst, src, plane, w, h)
@@ -149,14 +151,23 @@ func ditherOrdered(src, dst *image.RGBA, w, h int, p Params) (*image.RGBA, error
 
 	plane := readVec3Plane(src, w, h)
 	for y := 0; y < h; y++ {
+		mr := (y & mask) * n
+		row := y * w
 		for x := 0; x < w; x++ {
-			i := y*w + x
-			t := (m[y%n][x%n] - 0.5) * amp
-			plane[i] = vec3{quant(plane[i][0] + t), quant(plane[i][1] + t), quant(plane[i][2] + t)}
+			t := float32((m[mr+(x&mask)] - 0.5) * amp)
+			c := &plane[row+x]
+			c[0] = q32(quant, c[0]+t)
+			c[1] = q32(quant, c[1]+t)
+			c[2] = q32(quant, c[2]+t)
 		}
 	}
 	writeVec3Plane(dst, src, plane, w, h)
 	return dst, nil
+}
+
+// q32 applies a float64 quantiser to a float32 sample.
+func q32(quant func(float64) float64, v float32) float32 {
+	return float32(quant(float64(v)))
 }
 
 // bayerSize maps the matrix param to an edge length, defaulting to 4.
@@ -171,11 +182,11 @@ func bayerSize(s string) int {
 	}
 }
 
-// bayerMatrix returns an n x n Bayer threshold matrix with entries in
-// [0,1), built from the 2x2 recurrence rather than a hard-coded table. n
-// must be 2, 4 or 8. Each cell is centred (+0.5) inside its bucket so the
-// thresholds sit symmetrically around 0.5.
-func bayerMatrix(n int) [][]float64 {
+// bayerMatrix returns an n x n Bayer threshold matrix (flattened row-major,
+// length n*n) with entries in [0,1), built from the 2x2 recurrence rather
+// than a hard-coded table. n must be 2, 4 or 8. Each cell is centred (+0.5)
+// inside its bucket so the thresholds sit symmetrically around 0.5.
+func bayerMatrix(n int) []float64 {
 	cur := [][]int{{0, 2}, {3, 1}}
 	for size := 2; size < n; size *= 2 {
 		next := make([][]int, size*2)
@@ -194,11 +205,10 @@ func bayerMatrix(n int) [][]float64 {
 		cur = next
 	}
 	denom := float64(n * n)
-	out := make([][]float64, n)
+	out := make([]float64, n*n)
 	for y := 0; y < n; y++ {
-		out[y] = make([]float64, n)
 		for x := 0; x < n; x++ {
-			out[y][x] = (float64(cur[y][x]) + 0.5) / denom
+			out[y*n+x] = (float64(cur[y][x]) + 0.5) / denom
 		}
 	}
 	return out
@@ -219,8 +229,10 @@ func levelQuant(levels int) func(float64) float64 {
 	}
 }
 
-// vec3 is a working-precision RGB triple used while diffusing error.
-type vec3 = [3]float64
+// vec3 is a working-precision RGB triple used while diffusing error. float32
+// halves the plane's footprint (12 vs 24 bytes/px) and is enough precision
+// for an 8-bit result; the grayscale error-diffusion path keeps float64.
+type vec3 = [3]float32
 
 // diffCoef places a fraction w of the residual error at pixel offset
 // (dx, dy) — dx is mirrored with the scan direction, dy always runs forward.
@@ -283,6 +295,7 @@ func diffuse1(plane []float64, w, h int, serpentine bool, k []diffCoef, quant fu
 		if !ltr {
 			x, end, step = w-1, -1, -1
 		}
+		interiorRow := y < h-2
 		for ; x != end; x += step {
 			i := y*w + x
 			old := plane[i]
@@ -290,6 +303,15 @@ func diffuse1(plane []float64, w, h int, serpentine bool, k []diffCoef, quant fu
 			plane[i] = q
 			e := old - q
 			if e == 0 {
+				continue
+			}
+			// Interior pixels have every kernel tap in-bounds (|dx|<=2,
+			// dy in [0,2]); skip the per-tap bounds test. Same taps, same
+			// order, same arithmetic — byte-identical to the checked path.
+			if interiorRow && x >= 2 && x < w-2 {
+				for _, c := range k {
+					plane[(y+c.dy)*w+x+c.dx*step] += e * c.w
+				}
 				continue
 			}
 			for _, c := range k {
@@ -314,6 +336,7 @@ func diffuse3(plane []vec3, w, h int, serpentine bool, k []diffCoef, quant func(
 		if !ltr {
 			x, end, step = w-1, -1, -1
 		}
+		interiorRow := y < h-2
 		for ; x != end; x += step {
 			i := y*w + x
 			old := plane[i]
@@ -321,6 +344,12 @@ func diffuse3(plane []vec3, w, h int, serpentine bool, k []diffCoef, quant func(
 			plane[i] = q
 			e := vec3{old[0] - q[0], old[1] - q[1], old[2] - q[2]}
 			if e == (vec3{}) {
+				continue
+			}
+			if interiorRow && x >= 2 && x < w-2 {
+				for _, c := range k {
+					addVec(&plane[(y+c.dy)*w+x+c.dx*step], e, c.w)
+				}
 				continue
 			}
 			for _, c := range k {
@@ -336,9 +365,10 @@ func diffuse3(plane []vec3, w, h int, serpentine bool, k []diffCoef, quant func(
 }
 
 func addVec(p *vec3, e vec3, frac float64) {
-	p[0] += e[0] * frac
-	p[1] += e[1] * frac
-	p[2] += e[2] * frac
+	f := float32(frac)
+	p[0] += e[0] * f
+	p[1] += e[1] * f
+	p[2] += e[2] * f
 }
 
 func readVec3Plane(src *image.RGBA, w, h int) []vec3 {
@@ -347,7 +377,7 @@ func readVec3Plane(src *image.RGBA, w, h int) []vec3 {
 	for y := 0; y < h; y++ {
 		si := src.PixOffset(b.Min.X, b.Min.Y+y)
 		for x := 0; x < w; x++ {
-			plane[y*w+x] = vec3{float64(src.Pix[si]), float64(src.Pix[si+1]), float64(src.Pix[si+2])}
+			plane[y*w+x] = vec3{float32(src.Pix[si]), float32(src.Pix[si+1]), float32(src.Pix[si+2])}
 			si += 4
 		}
 	}
@@ -361,9 +391,9 @@ func writeVec3Plane(dst, src *image.RGBA, plane []vec3, w, h int) {
 		di := dst.PixOffset(0, y)
 		for x := 0; x < w; x++ {
 			v := plane[y*w+x]
-			dst.Pix[di] = clampU8(v[0])
-			dst.Pix[di+1] = clampU8(v[1])
-			dst.Pix[di+2] = clampU8(v[2])
+			dst.Pix[di] = clampU8(float64(v[0]))
+			dst.Pix[di+1] = clampU8(float64(v[1]))
+			dst.Pix[di+2] = clampU8(float64(v[2]))
 			dst.Pix[di+3] = src.Pix[si+3]
 			si += 4
 			di += 4

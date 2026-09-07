@@ -21,7 +21,11 @@ v1 scope:
 - Image filters: coloured ASCII art, pixelate (8-bit), dithering (error-diffusion —
   Floyd–Steinberg / Atkinson / Stucki / Jarvis / Sierra / Burkes — plus an ordered Bayer mode),
   Sobel edge detection, glitch / RGB shift, colour quantization (poster), halftone (AM screen,
-  mono / CMYK / RGB), Voronoi stippling (`stipple`, uses `internal/voronoi`).
+  mono / CMYK / RGB), Voronoi stippling (`stipple`, uses `internal/voronoi`), `grayscale`
+  (black & white — weighted / linear-light / HSL tone, brightness·contrast, 1-bit threshold),
+  `paper` (print onto procedurally textured / aged paper — fibre grain, mottling, vignette),
+  `pencil` (black-graphite dodge sketch + diagonal hatching; `internal/filters` value noise
+  from `noise.go`).
 - Algorithmic generators — `internal/generators` registry + `internal/genall` link aggregator,
   each generator a self-registering package: `truchet` (multi-scale Truchet tiles),
   `harmonograph` (damped-sinusoid figure), `attractor` (De Jong / Clifford / Svensson density

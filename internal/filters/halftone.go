@@ -64,12 +64,9 @@ func init() { Register("halftone", Halftone) }
 // composites ink over paper.
 func halftoneMono(src, dst *image.RGBA, w, h, cell int, angle, gamma float64, invert bool, shape string, p Params) {
 	lp, _, _ := lumaPlane(src)
-	plane := make([]float64, len(lp))
-	for i, v := range lp {
-		plane[i] = v / 255
-	}
-	// darkIsInk: low luma -> large dot.
-	frac := halftoneScreen(plane, w, h, angle, cell, gamma, true, invert, shape)
+	// darkIsInk: low luma -> large dot. The screen normalises luma (0..255)
+	// to [0,1] itself, so the intermediate divided plane is gone.
+	frac := halftoneScreen(lp, w, h, angle, cell, gamma, 255, true, invert, shape)
 
 	ink, ok := parseHexColor(p.String("ink", "#000000"))
 	if !ok {
@@ -123,10 +120,10 @@ func halftoneCMYK(src, dst *image.RGBA, w, h, cell int, gamma float64, invert bo
 	}
 
 	// darkIsInk false: a larger channel value grows the dot.
-	fc := halftoneScreen(cP, w, h, 15, cell, gamma, false, invert, shape)
-	fm := halftoneScreen(mP, w, h, 75, cell, gamma, false, invert, shape)
-	fy := halftoneScreen(yP, w, h, 0, cell, gamma, false, invert, shape)
-	fk := halftoneScreen(kP, w, h, 45, cell, gamma, false, invert, shape)
+	fc := halftoneScreen(cP, w, h, 15, cell, gamma, 1, false, invert, shape)
+	fm := halftoneScreen(mP, w, h, 75, cell, gamma, 1, false, invert, shape)
+	fy := halftoneScreen(yP, w, h, 0, cell, gamma, 1, false, invert, shape)
+	fk := halftoneScreen(kP, w, h, 45, cell, gamma, 1, false, invert, shape)
 
 	for y := 0; y < h; y++ {
 		si := src.PixOffset(src.Bounds().Min.X, src.Bounds().Min.Y+y)
@@ -165,9 +162,9 @@ func halftoneRGB(src, dst *image.RGBA, w, h, cell int, gamma float64, invert boo
 		}
 	}
 
-	fr := halftoneScreen(rP, w, h, 15, cell, gamma, false, invert, shape)
-	fg := halftoneScreen(gP, w, h, 75, cell, gamma, false, invert, shape)
-	fb := halftoneScreen(bP, w, h, 0, cell, gamma, false, invert, shape)
+	fr := halftoneScreen(rP, w, h, 15, cell, gamma, 1, false, invert, shape)
+	fg := halftoneScreen(gP, w, h, 75, cell, gamma, 1, false, invert, shape)
+	fb := halftoneScreen(bP, w, h, 0, cell, gamma, 1, false, invert, shape)
 
 	for y := 0; y < h; y++ {
 		si := src.PixOffset(src.Bounds().Min.X, src.Bounds().Min.Y+y)
@@ -184,73 +181,183 @@ func halftoneRGB(src, dst *image.RGBA, w, h, cell int, gamma float64, invert boo
 	}
 }
 
-// halftoneScreen renders one AM screen. plane holds tone in [0,1] (row-major
-// w*h). The grid is rotated by angleDeg; each output pixel is 3x3
-// supersampled and the returned plane holds the ink fraction in [0,1].
+// halftone shape kinds, resolved from the string once per screen.
+const (
+	htCircle = iota
+	htSquare
+	htDiamond
+	htLine
+)
+
+func htShapeKind(shape string) int {
+	switch shape {
+	case "square":
+		return htSquare
+	case "diamond":
+		return htDiamond
+	case "line":
+		return htLine
+	default:
+		return htCircle
+	}
+}
+
+// halftoneScreen renders one AM screen. plane holds tone in [0,toneNorm]
+// (row-major w*h); toneNorm rescales it to [0,1] (255 for a raw luma plane, 1
+// for an already-normalised channel plane). The grid is rotated by angleDeg;
+// each output pixel is 3x3 supersampled and the returned plane holds the ink
+// fraction in [0,1].
 //
 // darkIsInk inverts the tone before the coverage curve (low tone -> big dot);
 // invert then flips it once more, exposing the public `invert` param.
-func halftoneScreen(plane []float64, w, h int, angleDeg float64, cellSize int, gamma float64, darkIsInk, invert bool, shape string) []float64 {
+//
+// Per-cell dot geometry is precomputed once into a dense grid keyed by cell
+// index (no map, no hashing) and stored as the exact scalar the shape test
+// needs — for circles that is radius squared, so the supersample loop runs
+// with zero math.Sqrt and zero math.Pow.
+func halftoneScreen(plane []float64, w, h int, angleDeg float64, cellSize int, gamma, toneNorm float64, darkIsInk, invert bool, shape string) []float64 {
 	out := make([]float64, w*h)
 	cs := float64(cellSize)
 	theta := angleDeg * math.Pi / 180
 	cos, sin := math.Cos(theta), math.Sin(theta)
+	kind := htShapeKind(shape)
 
-	// Memoise per-cell coverage; the map is only ever get/set by key, so
-	// iteration order never enters the result — output stays deterministic.
-	cache := make(map[[2]int]float64)
-	coverage := func(cx, cy int) float64 {
-		key := [2]int{cx, cy}
-		if v, ok := cache[key]; ok {
-			return v
+	// Screen-space bbox of the image in cell units — the rotation is linear
+	// so the extremes are at the four image corners. Pad by one cell for the
+	// sub-pixel sample offsets.
+	cxMin, cyMin := math.MaxInt, math.MaxInt
+	cxMax, cyMax := math.MinInt, math.MinInt
+	for _, c := range [4][2]float64{{0, 0}, {float64(w), 0}, {0, float64(h)}, {float64(w), float64(h)}} {
+		cx := int(math.Floor((c[0]*cos + c[1]*sin) / cs))
+		cy := int(math.Floor((-c[0]*sin + c[1]*cos) / cs))
+		if cx < cxMin {
+			cxMin = cx
 		}
-		// Cell centre: screen space -> image space, then average the plane
-		// over its axis-aligned bbox.
-		scx := (float64(cx) + 0.5) * cs
-		scy := (float64(cy) + 0.5) * cs
-		icx := scx*cos - scy*sin
-		icy := scx*sin + scy*cos
-		tone := avgPlane(plane, w, h,
-			int(math.Round(icx-cs/2)), int(math.Round(icy-cs/2)), cellSize)
+		if cx > cxMax {
+			cxMax = cx
+		}
+		if cy < cyMin {
+			cyMin = cy
+		}
+		if cy > cyMax {
+			cyMax = cy
+		}
+	}
+	cxMin--
+	cyMin--
+	cxMax++
+	cyMax++
+	gw := cxMax - cxMin + 1
+	gh := cyMax - cyMin + 1
 
-		base := tone
-		if darkIsInk {
-			base = 1 - base
+	// thr[cell] is the shape test threshold; a negative value means "empty
+	// cell, never inked".
+	thr := make([]float64, gw*gh)
+	circleK := (cs * 0.72) * (cs * 0.72)
+	for cy := cyMin; cy <= cyMax; cy++ {
+		for cx := cxMin; cx <= cxMax; cx++ {
+			scx := (float64(cx) + 0.5) * cs
+			scy := (float64(cy) + 0.5) * cs
+			icx := scx*cos - scy*sin
+			icy := scx*sin + scy*cos
+			tone := avgPlane(plane, w, h,
+				int(math.Round(icx-cs/2)), int(math.Round(icy-cs/2)), cellSize) / toneNorm
+
+			base := tone
+			if darkIsInk {
+				base = 1 - base
+			}
+			if invert {
+				base = 1 - base
+			}
+			if base < 0 {
+				base = 0
+			} else if base > 1 {
+				base = 1
+			}
+			cov := math.Pow(base, gamma)
+
+			var t float64
+			switch {
+			case cov <= 0:
+				t = -1
+			case kind == htSquare:
+				t = math.Sqrt(cov) * cs * 0.51
+			case kind == htDiamond:
+				t = math.Sqrt(cov) * cs * 0.9
+			case kind == htLine:
+				t = cov * cs * 0.5
+			default: // circle — store radius squared
+				t = cov * circleK
+			}
+			thr[(cy-cyMin)*gw+(cx-cxMin)] = t
 		}
-		if invert {
-			base = 1 - base
-		}
-		if base < 0 {
-			base = 0
-		} else if base > 1 {
-			base = 1
-		}
-		cov := math.Pow(base, gamma)
-		cache[key] = cov
-		return cov
 	}
 
+	// invCs avoids a divide per sub-pixel; bigK lets int() do a floor without
+	// math.Floor (coords stay well under bigK in magnitude).
+	invCs := 1 / cs
+	const bigK = 1 << 20
+
+	counts := make([]int, w) // sub-pixel hit tally for the current row, reused
 	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			inside := 0
-			for sy := 0; sy < 3; sy++ {
-				for sx := 0; sx < 3; sx++ {
-					px := float64(x) + (float64(sx)+0.5)/3
-					py := float64(y) + (float64(sy)+0.5)/3
-					// image space -> screen space
-					rx := px*cos + py*sin
-					ry := -px*sin + py*cos
-					cx := int(math.Floor(rx / cs))
-					cy := int(math.Floor(ry / cs))
-					cov := coverage(cx, cy)
-					ccx := (float64(cx) + 0.5) * cs
-					ccy := (float64(cy) + 0.5) * cs
-					if dotContains(shape, rx-ccx, ry-ccy, cov, cs) {
-						inside++
+		for i := range counts {
+			counts[i] = 0
+		}
+		for sy := 0; sy < 3; sy++ {
+			py := float64(y) + (float64(sy)+0.5)/3
+			for sx := 0; sx < 3; sx++ {
+				px0 := (float64(sx) + 0.5) / 3
+				// Screen-space coords at x=0 for this sub-pixel lane; step by
+				// (cos, -sin) per x instead of recomputing the rotation.
+				rx := px0*cos + py*sin
+				ry := -px0*sin + py*cos
+				for x := 0; x < w; x++ {
+					cx := int(rx*invCs+bigK) - bigK
+					cy := int(ry*invCs+bigK) - bigK
+					if cx < cxMin {
+						cx = cxMin
+					} else if cx > cxMax {
+						cx = cxMax
 					}
+					if cy < cyMin {
+						cy = cyMin
+					} else if cy > cyMax {
+						cy = cyMax
+					}
+					t := thr[(cy-cyMin)*gw+(cx-cxMin)]
+					if t >= 0 {
+						dx := rx - (float64(cx)+0.5)*cs
+						dy := ry - (float64(cy)+0.5)*cs
+						if dx < 0 {
+							dx = -dx
+						}
+						if dy < 0 {
+							dy = -dy
+						}
+						var hit bool
+						switch kind {
+						case htSquare:
+							hit = dx <= t && dy <= t
+						case htDiamond:
+							hit = dx+dy <= t
+						case htLine:
+							hit = dy <= t
+						default: // circle
+							hit = dx*dx+dy*dy <= t
+						}
+						if hit {
+							counts[x]++
+						}
+					}
+					rx += cos
+					ry -= sin
 				}
 			}
-			out[y*w+x] = float64(inside) / 9
+		}
+		row := y * w
+		for x := 0; x < w; x++ {
+			out[row+x] = float64(counts[x]) / 9
 		}
 	}
 	return out
@@ -283,26 +390,4 @@ func avgPlane(plane []float64, w, h, x0, y0, size int) float64 {
 		}
 	}
 	return sum / float64((x1-x0)*(y1-y0))
-}
-
-// dotContains reports whether the offset (dx,dy) from a cell centre lies
-// inside the dot of the given coverage. Scale factors are chosen so that
-// coverage 1 fully inks the cell for every shape.
-func dotContains(shape string, dx, dy, cov, cs float64) bool {
-	if cov <= 0 {
-		return false
-	}
-	switch shape {
-	case "square":
-		half := math.Sqrt(cov) * cs * 0.51
-		return math.Abs(dx) <= half && math.Abs(dy) <= half
-	case "diamond":
-		d := math.Sqrt(cov) * cs * 0.9
-		return math.Abs(dx)+math.Abs(dy) <= d
-	case "line":
-		return math.Abs(dy) <= cov*cs*0.5
-	default: // circle
-		r := math.Sqrt(cov) * cs * 0.72
-		return dx*dx+dy*dy <= r*r
-	}
 }

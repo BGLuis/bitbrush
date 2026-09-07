@@ -5,7 +5,7 @@ WASM_EXEC := web/public/wasm_exec.js
 .PHONY: wasm wasm-tiny dev build test check clean
 
 wasm:
-	GOOS=js GOARCH=wasm go build -o $(WASM_OUT) ./cmd/wasm
+	GOOS=js GOARCH=wasm go build -trimpath -ldflags="-s -w" -o $(WASM_OUT) ./cmd/wasm
 	@if [ -f "$(GOROOT)/lib/wasm/wasm_exec.js" ]; then \
 		cp "$(GOROOT)/lib/wasm/wasm_exec.js" $(WASM_EXEC); \
 	else \

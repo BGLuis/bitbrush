@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"image"
+	"runtime/debug"
 	"syscall/js"
 
 	"bitbrush/internal/anim"
@@ -14,12 +15,32 @@ import (
 )
 
 func main() {
+	// This runtime is single-threaded: GC mark/assist work runs on the same
+	// thread doing pixel work, so a collection mid-drag is visible jank. Each
+	// filter call churns tens of MB of scratch; at the default GOGC=100 that
+	// triggers a cycle almost every frame. Trade resident memory for far
+	// fewer cycles, with a soft ceiling so a huge export still stays bounded.
+	debug.SetGCPercent(300)
+	debug.SetMemoryLimit(768 << 20)
+
+	uint8Array = js.Global().Get("Uint8Array")
+
 	js.Global().Set("bitbrushApplyFilter", js.FuncOf(applyFilter))
 	js.Global().Set("bitbrushAsciiText", js.FuncOf(asciiText))
 	js.Global().Set("bitbrushRenderGIF", js.FuncOf(renderGIF))
 	registerGenerators()
 	select {} // block forever so the registered funcs stay callable
 }
+
+// uint8Array is globalThis.Uint8Array, resolved once in main. Looking it up
+// per call (js.Global().Get) is two boundary crossings on every op.
+var uint8Array js.Value
+
+// ioBuf is a single reusable staging buffer for RGBA bytes coming across the
+// boundary, grown on demand and never shrunk. Safe because calls are
+// serialised (one WASM instance, one thread) and decodeImage copies the JS
+// bytes straight into a fresh *image.RGBA-shaped view of it.
+var ioBuf []byte
 
 // applyFilter(name string, rgba Uint8Array, w int, h int, paramsJSON string)
 // returns { ok: bool, data: Uint8Array|null, error: string }.
@@ -44,7 +65,7 @@ func applyFilter(_ js.Value, args []js.Value) (result any) {
 		return map[string]any{"ok": false, "data": js.Null(), "error": err.Error()}
 	}
 
-	dst := js.Global().Get("Uint8Array").New(len(out.Pix))
+	dst := uint8Array.New(len(out.Pix))
 	js.CopyBytesToJS(dst, out.Pix)
 	return map[string]any{"ok": true, "data": dst, "error": ""}
 }
@@ -126,20 +147,26 @@ func renderGIF(_ js.Value, args []js.Value) (result any) {
 		return map[string]any{"ok": false, "data": js.Null(), "error": err.Error()}
 	}
 
-	dst := js.Global().Get("Uint8Array").New(len(data))
+	dst := uint8Array.New(len(data))
 	js.CopyBytesToJS(dst, data)
 	return map[string]any{"ok": true, "data": dst, "error": ""}
 }
 
-// decodeImage copies a Uint8Array of RGBA bytes into a Go-owned *image.RGBA.
+// decodeImage copies a Uint8Array of RGBA bytes into a Go-owned *image.RGBA
+// backed by the shared ioBuf. The caller must finish with the returned image
+// (or copy what it needs out) before the next boundary call reuses ioBuf.
 func decodeImage(rgbaJS, wJS, hJS js.Value) (*image.RGBA, error) {
 	w, h := wJS.Int(), hJS.Int()
-	buf := make([]byte, rgbaJS.Get("length").Int())
-	js.CopyBytesToGo(buf, rgbaJS)
-	if len(buf) != w*h*4 {
-		return nil, fmt.Errorf("expected %d bytes for a %dx%d RGBA image, got %d", w*h*4, w, h, len(buf))
+	n := rgbaJS.Get("length").Int()
+	if n != w*h*4 {
+		return nil, fmt.Errorf("expected %d bytes for a %dx%d RGBA image, got %d", w*h*4, w, h, n)
 	}
-	return &image.RGBA{Pix: buf, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}, nil
+	if cap(ioBuf) < n {
+		ioBuf = make([]byte, n)
+	}
+	ioBuf = ioBuf[:n]
+	js.CopyBytesToGo(ioBuf, rgbaJS)
+	return &image.RGBA{Pix: ioBuf, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}, nil
 }
 
 // decodeParams reads the optional JSON-object argument at args[i], if any.

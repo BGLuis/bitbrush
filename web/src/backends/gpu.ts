@@ -195,6 +195,15 @@ class GpuBackend implements FilterBackend {
   #w = 0;
   #h = 0;
 
+  // Cached pixelate uniform locations (looked up once at link time, not per
+  // frame) and source-texture state so a slider drag that only changes
+  // blockSize skips the texImage2D upload + full generateMipmap entirely.
+  #pixLoc: { tex: WebGLUniformLocation | null; res: WebGLUniformLocation | null; block: WebGLUniformLocation | null } | null =
+    null;
+  #texW = 0;
+  #texH = 0;
+  #lastData: Uint8ClampedArray | null = null;
+
   async init(): Promise<void> {
     const canvas = document.createElement("canvas");
     const gl = canvas.getContext("webgl2", {
@@ -207,6 +216,11 @@ class GpuBackend implements FilterBackend {
     this.#gl = gl;
     this.#pixelate = linkProgram(gl, VERT, FRAG_PIXELATE);
     this.#noise = linkProgram(gl, VERT, FRAG_NOISE);
+    this.#pixLoc = {
+      tex: gl.getUniformLocation(this.#pixelate, "u_tex"),
+      res: gl.getUniformLocation(this.#pixelate, "u_resolution"),
+      block: gl.getUniformLocation(this.#pixelate, "u_block"),
+    };
     this.#vao = gl.createVertexArray(); // no attributes; gl_VertexID drives the quad
     this.#tex = gl.createTexture();
     // The CPU core still handles most effects and the text export.
@@ -317,22 +331,42 @@ class GpuBackend implements FilterBackend {
     const block = Math.max(1, Math.round(Number(params.blockSize ?? 8)));
     this.#resize(img.width, img.height);
 
-    gl.bindTexture(gl.TEXTURE_2D, this.#tex);
-    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, img.width, img.height, 0, gl.RGBA, gl.UNSIGNED_BYTE, img.data);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.generateMipmap(gl.TEXTURE_2D); // mip levels ≈ progressively box-averaged
+    // Re-upload the source only when it actually changed. A blockSize drag
+    // reuses the same ImageData, so this skips a full RGBA upload + mipmap
+    // pyramid rebuild every frame — the expensive part of this path.
+    const dimsChanged = this.#texW !== img.width || this.#texH !== img.height;
+    if (dimsChanged || this.#lastData !== img.data) {
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      if (dimsChanged) {
+        // texStorage2D is one-shot per texture object; recreate to resize.
+        gl.deleteTexture(this.#tex);
+        this.#tex = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.#tex);
+        const levels = 1 + Math.floor(Math.log2(Math.max(img.width, img.height)));
+        gl.texStorage2D(gl.TEXTURE_2D, levels, gl.RGBA8, img.width, img.height);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        this.#texW = img.width;
+        this.#texH = img.height;
+      } else {
+        gl.bindTexture(gl.TEXTURE_2D, this.#tex);
+      }
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, img.width, img.height, gl.RGBA, gl.UNSIGNED_BYTE, img.data);
+      gl.generateMipmap(gl.TEXTURE_2D); // mip levels ≈ progressively box-averaged
+      this.#lastData = img.data;
+    } else {
+      gl.bindTexture(gl.TEXTURE_2D, this.#tex);
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.#fbo);
     gl.viewport(0, 0, img.width, img.height);
     gl.useProgram(this.#pixelate);
     gl.bindVertexArray(this.#vao);
-    gl.uniform1i(gl.getUniformLocation(this.#pixelate!, "u_tex"), 0);
-    gl.uniform2f(gl.getUniformLocation(this.#pixelate!, "u_resolution"), img.width, img.height);
-    gl.uniform1f(gl.getUniformLocation(this.#pixelate!, "u_block"), block);
+    gl.uniform1i(this.#pixLoc!.tex, 0);
+    gl.uniform2f(this.#pixLoc!.res, img.width, img.height);
+    gl.uniform1f(this.#pixLoc!.block, block);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     const out = new Uint8Array(img.width * img.height * 4);

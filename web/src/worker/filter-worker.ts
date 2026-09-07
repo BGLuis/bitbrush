@@ -34,33 +34,33 @@ self.onmessage = async (e) => {
       return;
     }
 
+    // r.data is a fresh JS-heap Uint8Array (Go's uint8Array.New + CopyBytesToJS),
+    // not a view onto WASM memory, so its buffer can be transferred as-is —
+    // no defensive .slice() copy.
+
     // Ops with no input buffer.
     if (req.op === "gradient") {
       const r = bitbrushRenderGradient(req.params);
       if (!r.ok || !r.data) throw new Error(r.error || "gradient render failed");
-      const out = r.data.slice();
-      self.postMessage({ id: req.id, ok: true, buf: out.buffer, width: req.width, height: req.height }, [out.buffer]);
+      self.postMessage({ id: req.id, ok: true, buf: r.data.buffer, width: req.width, height: req.height }, [r.data.buffer]);
       return;
     }
     if (req.op === "noisefield") {
       const r = bitbrushRenderNoiseField(req.params, req.width, req.height);
       if (!r.ok || !r.data) throw new Error(r.error || "noise field render failed");
-      const out = r.data.slice();
-      self.postMessage({ id: req.id, ok: true, buf: out.buffer, width: req.width, height: req.height }, [out.buffer]);
+      self.postMessage({ id: req.id, ok: true, buf: r.data.buffer, width: req.width, height: req.height }, [r.data.buffer]);
       return;
     }
     if (req.op === "noisefieldGif") {
       const r = bitbrushRenderNoiseFieldGIF(req.startParams, req.endParams, req.width, req.height, req.options);
       if (!r.ok || !r.data) throw new Error(r.error || "noise field gif failed");
-      const out = r.data.slice();
-      self.postMessage({ id: req.id, ok: true, buf: out.buffer }, [out.buffer]);
+      self.postMessage({ id: req.id, ok: true, buf: r.data.buffer }, [r.data.buffer]);
       return;
     }
     if (req.op === "generator") {
       const r = bitbrushRenderGenerator(req.name, req.params, req.width, req.height);
       if (!r.ok || !r.data) throw new Error(r.error || "generator render failed");
-      const out = r.data.slice();
-      self.postMessage({ id: req.id, ok: true, buf: out.buffer, width: req.width, height: req.height }, [out.buffer]);
+      self.postMessage({ id: req.id, ok: true, buf: r.data.buffer, width: req.width, height: req.height }, [r.data.buffer]);
       return;
     }
     if (req.op === "gradientCSS") {
@@ -95,15 +95,16 @@ self.onmessage = async (e) => {
     if (req.op === "gif") {
       const r = bitbrushRenderGIF(req.name, bytes, req.width, req.height, req.keyframes, req.options);
       if (!r.ok || !r.data) throw new Error(r.error || "gif render failed");
-      const out = r.data.slice();
-      self.postMessage({ id: req.id, ok: true, buf: out.buffer }, [out.buffer]);
+      self.postMessage({ id: req.id, ok: true, buf: r.data.buffer }, [r.data.buffer]);
       return;
     }
 
     const r = bitbrushApplyFilter(req.name, bytes, req.width, req.height, req.params);
     if (!r.ok || !r.data) throw new Error(r.error || "filter failed");
-    const out = r.data.slice(); // detach from Go's view before transferring
-    self.postMessage({ id: req.id, ok: true, buf: out.buffer, width: req.width, height: req.height }, [out.buffer]);
+    self.postMessage(
+      { id: req.id, ok: true, buf: r.data.buffer, width: req.width, height: req.height },
+      [r.data.buffer],
+    );
   } catch (err) {
     self.postMessage({ id: req.id, ok: false, error: String(err) });
   }

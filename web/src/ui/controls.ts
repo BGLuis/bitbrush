@@ -48,6 +48,58 @@ export const effects: EffectUI[] = [
     ],
   },
   {
+    name: "grayscale",
+    title: "Preto e branco",
+    controls: [
+      {
+        key: "method",
+        label: "Ponderação do tom",
+        type: "select",
+        options: ["luma", "luminance", "average", "bt601", "lightness"],
+        default: "luma",
+      },
+      { key: "brightness", label: "Brilho", type: "range", min: -100, max: 100, step: 1, default: 0 },
+      { key: "contrast", label: "Contraste", type: "range", min: -100, max: 100, step: 1, default: 0 },
+      {
+        key: "threshold",
+        label: "Limiar 1-bit (0 = contínuo)",
+        type: "range",
+        min: 0,
+        max: 255,
+        step: 1,
+        default: 0,
+      },
+      { key: "invert", label: "Inverter", type: "checkbox", default: false },
+    ],
+  },
+  {
+    name: "paper",
+    title: "Simulação de papel",
+    controls: [
+      { key: "seed", label: "Semente", type: "seed", default: 0 },
+      { key: "paper", label: "Cor do papel (hex)", type: "text", default: "#f3ecd8" },
+      { key: "age", label: "Envelhecimento (sépia)", type: "range", min: 0, max: 1, step: 0.05, default: 0.5 },
+      { key: "grain", label: "Grão das fibras", type: "range", min: 0, max: 1, step: 0.05, default: 0.35 },
+      { key: "mottle", label: "Manchas amplas", type: "range", min: 0, max: 1, step: 0.05, default: 0.3 },
+      { key: "fibers", label: "Estrias verticais", type: "range", min: 0, max: 1, step: 0.05, default: 0.2 },
+      { key: "scale", label: "Escala da textura", type: "range", min: 0.5, max: 8, step: 0.1, default: 2 },
+      { key: "vignette", label: "Vinheta", type: "range", min: 0, max: 1, step: 0.05, default: 0.25 },
+    ],
+  },
+  {
+    name: "pencil",
+    title: "Desenho a lápis preto",
+    controls: [
+      { key: "blur", label: "Raio do traço", type: "range", min: 1, max: 40, step: 1, default: 8 },
+      { key: "strength", label: "Intensidade do esboço", type: "range", min: 0, max: 1, step: 0.05, default: 1 },
+      { key: "darkness", label: "Peso do grafite", type: "range", min: 0.3, max: 4, step: 0.05, default: 1 },
+      { key: "hatch", label: "Hachura nas sombras", type: "range", min: 0, max: 1, step: 0.05, default: 0.3 },
+      { key: "seed", label: "Semente da hachura", type: "seed", default: 0 },
+      { key: "graphite", label: "Cor do grafite (hex)", type: "text", default: "#1b1b1b" },
+      { key: "paper", label: "Cor do papel (hex)", type: "text", default: "#f6f3ea" },
+    ],
+  },
+  {
     name: "sobel",
     title: "Detecção de bordas (Sobel)",
     controls: [

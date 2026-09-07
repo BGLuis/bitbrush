@@ -40,15 +40,15 @@ class WorkerBackend implements FilterBackend {
     if (typeof Worker === "undefined") {
       return Promise.reject(new Error("Web Workers unavailable"));
     }
-    const poolSize = Math.max(
-      1,
-      Math.min(
-        4,
-        typeof navigator !== "undefined" && navigator.hardwareConcurrency
-          ? Math.max(1, Math.floor(navigator.hardwareConcurrency / 2))
-          : 2,
-      ),
-    );
+    // Each worker is a full Go runtime (own heap, GC, ~tens of MB baseline)
+    // and compiles the wasm module separately. The interactive preview stream
+    // is serial and pinned to worker[0] (see #send), so a second worker only
+    // earns its keep for parallel batch work (GIF frames, export). Two is the
+    // sweet spot; more just multiplies startup compile and resident memory.
+    const poolSize =
+      typeof navigator !== "undefined" && navigator.hardwareConcurrency && navigator.hardwareConcurrency > 2
+        ? 2
+        : 1;
     const inits: Promise<void>[] = [];
     for (let i = 0; i < poolSize; i++) {
       const worker = new Worker(new URL("../worker/filter-worker.ts", import.meta.url), {
@@ -73,7 +73,7 @@ class WorkerBackend implements FilterBackend {
 
   async applyFilter(name: string, img: ImageData, params: FilterParams): Promise<ImageData> {
     const copy = img.data.slice(); // don't neuter the caller's ImageData on transfer
-    const r = await this.#send(
+    const r = await this.#sendPinned(
       { op: "filter", name, buf: copy.buffer, width: img.width, height: img.height, params: JSON.stringify(params) },
       [copy.buffer],
     );
@@ -200,11 +200,20 @@ class WorkerBackend implements FilterBackend {
     });
   }
 
+  // #send round-robins across the pool — for parallel batch work (GIF frames).
+  // #sendPinned always targets worker[0] so the interactive filter stream
+  // keeps hitting one warm Go instance (hot GC state, hot reusable buffers)
+  // instead of paying a cold warm-up on alternate ticks.
   #send(msg: Record<string, unknown>, transfer: Transferable[] = []): Promise<Reply> {
     if (this.#workers.length === 0) return Promise.reject(new Error("no workers running"));
     const worker = this.#workers[this.#roundRobin % this.#workers.length];
     this.#roundRobin++;
     return this.#sendToWorker(worker, msg, transfer);
+  }
+
+  #sendPinned(msg: Record<string, unknown>, transfer: Transferable[] = []): Promise<Reply> {
+    if (this.#workers.length === 0) return Promise.reject(new Error("no workers running"));
+    return this.#sendToWorker(this.#workers[0], msg, transfer);
   }
 }
 

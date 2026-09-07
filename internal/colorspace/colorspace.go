@@ -21,6 +21,55 @@ func EncodeChannel(c float64) float64 {
 	return 1.055*math.Pow(c, 1.0/2.4) - 0.055
 }
 
+// linLUT is LinearizeChannel evaluated at every 8-bit sRGB code. It lets the
+// hot paths (OKLab conversion, palette mapping, grayscale) skip a per-pixel
+// math.Pow. Because the input domain is exactly {0/255 .. 255/255}, a lookup
+// here is bit-identical to calling LinearizeChannel(float64(c)/255).
+var linLUT = func() [256]float64 {
+	var t [256]float64
+	for i := range t {
+		t[i] = LinearizeChannel(float64(i) / 255)
+	}
+	return t
+}()
+
+// Linearize8 returns the linear-light value of one gamma-encoded 8-bit sRGB
+// channel. Equivalent to LinearizeChannel(float64(c)/255), table-backed.
+func Linearize8(c uint8) float64 { return linLUT[c] }
+
+// encU8LUT maps a linear-light value in [0,1], quantised to encLUTSteps
+// buckets, to its gamma-encoded 8-bit code. Used where the result is an 8-bit
+// pixel anyway (grayscale tone), so bucket rounding is below output precision.
+const encLUTSteps = 4096
+
+var encU8LUT = func() [encLUTSteps + 1]uint8 {
+	var t [encLUTSteps + 1]uint8
+	for i := range t {
+		v := EncodeChannel(float64(i)/encLUTSteps) * 255
+		switch {
+		case v <= 0:
+			t[i] = 0
+		case v >= 255:
+			t[i] = 255
+		default:
+			t[i] = uint8(v + 0.5)
+		}
+	}
+	return t
+}()
+
+// Encode8 gamma-encodes a linear-light value in [0,1] to an 8-bit sRGB code,
+// clamping out-of-range input. Table-backed inverse of Linearize8.
+func Encode8(y float64) uint8 {
+	if y <= 0 {
+		return encU8LUT[0]
+	}
+	if y >= 1 {
+		return encU8LUT[encLUTSteps]
+	}
+	return encU8LUT[int(y*encLUTSteps+0.5)]
+}
+
 // OKLab is a colour in the OKLab perceptual space (Björn Ottosson, 2020):
 // L is lightness in ~[0,1], A and B are the green–red and blue–yellow axes.
 // Euclidean distance in OKLab is a good approximation of perceived difference.
@@ -28,9 +77,9 @@ type OKLab struct{ L, A, B float64 }
 
 // RGBToOKLab converts a gamma-encoded 8-bit sRGB triple to OKLab.
 func RGBToOKLab(r, g, b uint8) OKLab {
-	lr := LinearizeChannel(float64(r) / 255)
-	lg := LinearizeChannel(float64(g) / 255)
-	lb := LinearizeChannel(float64(b) / 255)
+	lr := linLUT[r]
+	lg := linLUT[g]
+	lb := linLUT[b]
 
 	l := math.Cbrt(0.4122214708*lr + 0.5363325363*lg + 0.0514459929*lb)
 	m := math.Cbrt(0.2119034982*lr + 0.6806995451*lg + 0.1073969566*lb)
