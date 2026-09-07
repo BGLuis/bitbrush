@@ -1,7 +1,13 @@
 <script lang="ts">
   import { effects } from "../ui/controls";
   import { generators } from "../ui/generators";
-  import { ui, selectEffect, selectPatternTool, selectGenerator } from "./store.svelte";
+  import {
+    ui,
+    selectEffect,
+    selectPatternTool,
+    selectGenerator,
+    selectCompose,
+  } from "./store.svelte";
   import { generatorStore } from "./generator/generator-store.svelte";
 </script>
 
@@ -32,6 +38,8 @@
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none" /></svg>
   {:else if name === "palette"}
     <svg viewBox="0 0 24 24"><rect x="3.5" y="4" width="4.5" height="16" /><rect x="9.7" y="4" width="4.5" height="16" /><rect x="16" y="4" width="4.5" height="16" /></svg>
+  {:else if name === "compose"}
+    <svg viewBox="0 0 24 24"><rect x="4" y="8.5" width="13" height="11" rx="1.5" /><path d="M8 8.5V5.5a1.5 1.5 0 0 1 1.5-1.5H20a1.5 1.5 0 0 1 1.5 1.5V15A1.5 1.5 0 0 1 20 16.5h-3" /></svg>
   {/if}
 {/snippet}
 
@@ -102,6 +110,13 @@
   >
     {@render ico("palette")}
     <span>Paleta</span>
+  </button>
+
+  <div class="sep"></div>
+  <h4>Compor</h4>
+  <button class="tool" class:on={ui.mode === "compose"} onclick={() => selectCompose()}>
+    {@render ico("compose")}
+    <span>Pilha de camadas</span>
   </button>
 </nav>
 

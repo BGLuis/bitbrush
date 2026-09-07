@@ -29,6 +29,7 @@ func main() {
 	js.Global().Set("bitbrushAsciiText", js.FuncOf(asciiText))
 	js.Global().Set("bitbrushRenderGIF", js.FuncOf(renderGIF))
 	registerGenerators()
+	registerCompositor()
 	select {} // block forever so the registered funcs stay callable
 }
 
@@ -167,6 +168,48 @@ func decodeImage(rgbaJS, wJS, hJS js.Value) (*image.RGBA, error) {
 	ioBuf = ioBuf[:n]
 	js.CopyBytesToGo(ioBuf, rgbaJS)
 	return &image.RGBA{Pix: ioBuf, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}, nil
+}
+
+// decodeImageFresh copies a Uint8Array of RGBA bytes into a newly allocated
+// *image.RGBA that does NOT alias ioBuf. Use it whenever an operation needs
+// more than one image live at once (ioBuf backs only one).
+func decodeImageFresh(rgbaJS, wJS, hJS js.Value) (*image.RGBA, error) {
+	w, h := wJS.Int(), hJS.Int()
+	n := rgbaJS.Get("length").Int()
+	if n != w*h*4 {
+		return nil, fmt.Errorf("expected %d bytes for a %dx%d RGBA image, got %d", w*h*4, w, h, n)
+	}
+	buf := make([]byte, n)
+	js.CopyBytesToGo(buf, rgbaJS)
+	return &image.RGBA{Pix: buf, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}, nil
+}
+
+// decodeImageList slices one concatenated Uint8Array of RGBA bytes into a
+// list of freshly allocated images using dims [[w,h],...]. Each image owns
+// its backing slice — no ioBuf aliasing.
+func decodeImageList(concatJS js.Value, dimsJSON string) ([]*image.RGBA, error) {
+	var dims [][2]int
+	if err := json.Unmarshal([]byte(dimsJSON), &dims); err != nil {
+		return nil, fmt.Errorf("bad image dims: %w", err)
+	}
+	total := concatJS.Get("length").Int()
+	whole := make([]byte, total)
+	js.CopyBytesToGo(whole, concatJS)
+
+	out := make([]*image.RGBA, len(dims))
+	off := 0
+	for i, d := range dims {
+		w, h := d[0], d[1]
+		n := w * h * 4
+		if w <= 0 || h <= 0 || off+n > total {
+			return nil, fmt.Errorf("image %d: bad dims %dx%d at offset %d of %d bytes", i, w, h, off, total)
+		}
+		buf := make([]byte, n)
+		copy(buf, whole[off:off+n])
+		out[i] = &image.RGBA{Pix: buf, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}
+		off += n
+	}
+	return out, nil
 }
 
 // decodeParams reads the optional JSON-object argument at args[i], if any.

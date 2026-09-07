@@ -18,6 +18,7 @@ import {
   gradientCSS as wasmGradientCSS,
   renderNoiseFieldGIF as wasmRenderNoiseFieldGIF,
   renderGenerator as wasmRenderGenerator,
+  renderComposite as wasmRenderComposite,
   extractPalette as wasmExtractPalette,
   genPalette as wasmGenPalette,
 } from "../wasm";
@@ -31,6 +32,7 @@ import type {
   GradientCSSOptions,
   NoiseFieldParams,
   GeneratorParams,
+  ComposeSpec,
   PaletteExtractOptions,
   PaletteHarmonyOptions,
 } from "../wasm";
@@ -296,6 +298,16 @@ class GpuBackend implements FilterBackend {
     h: number,
   ): Promise<ImageData> {
     return wasmRenderGenerator(name, params, w, h);
+  }
+
+  // The layer-stack compositor orchestrates many CPU passes (filters,
+  // generators, blends); no shader here — it runs on the Go core.
+  async renderComposite(
+    base: ImageData | null,
+    spec: ComposeSpec,
+    extras: ImageData[],
+  ): Promise<ImageData> {
+    return wasmRenderComposite(base, spec, extras);
   }
 
   async extractPalette(img: ImageData, options: PaletteExtractOptions): Promise<string[]> {

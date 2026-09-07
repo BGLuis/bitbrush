@@ -9,8 +9,9 @@ import { readStateFromURL } from "../state";
 import { readSettings, type Settings } from "../settings";
 import type { FilterParams } from "../wasm";
 import { generatorStore } from "./generator/generator-store.svelte";
+import { composeStore } from "./compose/compose-store.svelte";
 
-export type Mode = "filter" | "pattern" | "generator" | "palette";
+export type Mode = "filter" | "pattern" | "generator" | "palette" | "compose";
 
 export function effectByName(name: string): EffectUI | undefined {
   return effects.find((e) => e.name === name);
@@ -34,6 +35,9 @@ const startEffect = url.effect && effectByName(url.effect) ? url.effect : effect
 
 if (url.generator) {
   generatorStore.hydrateFromURL(url.generator);
+}
+if (url.compose) {
+  composeStore.hydrateFromURL(url.compose);
 }
 
 export const ui = $state({
@@ -72,6 +76,12 @@ export function selectGenerator(mode: "generator" | "palette"): void {
   }
   generatorStore.scheduleRender();
   generatorStore.syncAnimation();
+}
+
+export function selectCompose(): void {
+  ui.mode = "compose";
+  generatorStore.stopAnimation();
+  composeStore.scheduleRender();
 }
 
 export function resetParams(): void {

@@ -102,8 +102,17 @@ localStorage pref, *not* URL state); exports always run on the full-resolution o
 `App.svelte` is the three-zone Estúdio layout (`Topbar` / `ToolRail` · `Stage` · `Inspector` /
 `Statusbar`). Shared state is `store.svelte.ts` (`ui` runes object + `refs.canvas`); a single
 `$effect` in `App.svelte` is the live filter loop — it writes the URL recipe and hands a
-coalesced job to `app/lib/render.ts`. Filter params render from the `ui/controls.ts` descriptors
-via `app/ParamControls.svelte` (the Svelte port of the old `ui/panel.ts`).
+coalesced job to `app/lib/render.ts`. Descriptor-driven forms (`ui/controls.ts` /
+`ui/generators.ts`) render through the shared `app/ParamForm.svelte` (the pure renderer split out
+of the old `ui/panel.ts`); `app/ParamControls.svelte` is a thin wrapper binding it to the
+single-filter `ui.params` plus the ASCII text-export box.
+
+`ui.mode` also has a **`compose`** value — the "Compor" layer-stack mode
+(`app/compose/`): `compose-store.svelte.ts` (runes store, mirrors `generator-store`), its own
+`compose/lib/render.ts` loop, `ComposePanel` → `LayerList`/`LayerRow`/`LayerEditor`/`ChainEditor`,
+and its own `state.ts` branch (`writeComposeStateToURL`, one compact `cs=` JSON param). It calls
+`backend.renderComposite(base, spec, extras)` → `internal/compositor`. Uploaded second-image bytes
+never travel in a link — an `img` layer round-trips its recipe but returns needing a re-drop.
 
 `App.svelte` also mounts three global-overlay siblings: `DropZone.svelte` (window-level
 drag-and-drop + clipboard paste of an image → `app/lib/image.ts`), `KeyboardShortcuts.svelte`
@@ -138,8 +147,12 @@ per row — the call overhead dominates.
   palette set in `cmd/wasm/generators.go`: `bitbrushRenderGradient(paramsJSON)`,
   `bitbrushGradientCSS(paramsJSON, cssOptionsJSON)`, `bitbrushRenderNoiseField(paramsJSON, w, h)`,
   `bitbrushExtractPalette(rgba, w, h, optionsJSON)` → `{ok, colors: string[], error}`,
-  `bitbrushGenPalette(optionsJSON)` → `{ok, colors, error}`. All go through the FilterBackend
-  seam (worker by default); enums cross as lower-case name strings.
+  `bitbrushGenPalette(optionsJSON)` → `{ok, colors, error}`, and the layer-stack compositor
+  `bitbrushRenderComposite(baseRGBA|null, baseW, baseH, specJSON, extrasRGBA, extrasDimsJSON)` →
+  `{ok, data, width, height, error}` in `cmd/wasm/compositor.go` — the one global that crosses
+  with **more than one image** (base + N concatenated extra layer images), so it uses
+  `decodeImageFresh` / `decodeImageList` instead of the shared `ioBuf`. All go through the
+  FilterBackend seam (worker by default); enums cross as lower-case name strings.
 
 ### Registry pattern
 
@@ -155,6 +168,12 @@ Filters and generators are registered by string name with a uniform signature.
   `func(json.RawMessage, w, h int) (*image.RGBA, error)`; dispatched by `bitbrushRenderGenerator`.
 - `internal/gradient` and `internal/noisefield` predate the generator registry and keep their own
   dedicated globals.
+- `internal/compositor` is an **orchestrator, not a registered effect** (like `internal/anim`): it
+  consumes filters + generators + gradient + noisefield and blends an ordered `[]Layer` stack with
+  separable blend modes + Porter-Duff source-over (`Evaluate(spec, base, extras)`). Each layer has
+  a source (`base` / `image` / `generator` / `gradient` / `noisefield`), its own ordered filter
+  `Chain`, a `Blend`, an `Opacity` and a `Fit`. Blend maths follow the W3C compositing spec on
+  gamma-encoded sRGB. This backs the "Compor" shell mode.
 
 Keep that shape — don't special-case individual effects in the adapter or the shell.
 
@@ -174,9 +193,11 @@ URL-encodable so a result is shareable and reproducible.
 ## Layout
 
 ```
-cmd/wasm/main.go        syscall/js adapter — filters, ascii, gif
+cmd/wasm/main.go        syscall/js adapter — filters, ascii, gif (+ decodeImageFresh/List helpers)
 cmd/wasm/generators.go  syscall/js adapter — gradient / noisefield / palette / generator globals
+cmd/wasm/compositor.go  syscall/js adapter — bitbrushRenderComposite (the "Compor" layer stack)
 internal/filters/       the image filters + registry (incl. halftone, stipple, dither kernels)
+internal/compositor/    layer-stack evaluator — blend modes + source-over + per-layer filter chain
 internal/anim/          keyframe param interpolation + multi-frame render + animated GIF encode
 internal/gradient/      multi-stop gradient sampling, easing curves, CSS emission
 internal/noisefield/    generative noise-field gradient (Gradient Studio shader port)
@@ -207,9 +228,14 @@ web/                    Vite + Svelte 5 project
     palette-panel.ts    palette extraction + harmony   (imperative, wrapped)
     app/                the Svelte "Estúdio" shell
       App.svelte        3-zone layout + the live filter $effect + overlay siblings
-      store.svelte.ts   `ui` runes state + `refs.canvas`
+      store.svelte.ts   `ui` runes state (+ `mode: compose`) + `refs.canvas`
       Topbar/ToolRail/Stage/Inspector/Statusbar.svelte
-      ParamControls.svelte   descriptor -> live form (was ui/panel.ts)
+      ParamForm.svelte       pure descriptor -> live form renderer (was ui/panel.ts)
+      ParamControls.svelte   filter-mode wrapper around ParamForm + ASCII text export
+      compose/          the "Compor" layer-stack mode
+        compose-store.svelte.ts  runes store: layers, image slots, render loop, URL sync
+        lib/render.ts   rAF-coalesced, seq-guarded compose render
+        ComposePanel / LayerList / LayerRow / LayerEditor / ChainEditor .svelte
       DropZone.svelte   window drag-and-drop + clipboard paste of an image
       KeyboardShortcuts.svelte  keydown map + the `?` help sheet
       Toast.svelte      transient notices (lib/toast.svelte.ts store)
@@ -217,6 +243,7 @@ web/                    Vite + Svelte 5 project
       lib/panel.ts      action hosting an imperative `{ element }` panel
       lib/wrapped.ts    factories for the three wrapped panels
       lib/image.ts      file load + preview downscale, wired to `ui`
+      lib/download.ts   canvas -> PNG download (shared: filter + compose export)
       lib/actions.ts    shared top-bar actions (export PNG / share link / cycle effect)
       lib/view.svelte.ts  filter-mode canvas zoom / scroll state
   public/               main.wasm, wasm_exec.js  (build outputs — gitignored)

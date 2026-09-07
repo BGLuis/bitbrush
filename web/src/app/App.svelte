@@ -12,6 +12,7 @@
   import { writeStateToURL } from "../state";
   import type { FilterParams } from "../wasm";
   import { generatorStore } from "./generator/generator-store.svelte";
+  import { composeStore } from "./compose/compose-store.svelte";
 
   // The live filter loop: any change to effect / params / preview / engine
   // rewrites the URL recipe and asks render.ts for a (coalesced) repaint.
@@ -33,6 +34,15 @@
     } else if (ui.mode === "generator" || ui.mode === "pattern") {
       generatorStore.scheduleRender();
       generatorStore.syncAnimation();
+    } else if (ui.mode === "compose") {
+      generatorStore.stopAnimation();
+      // Layer / slot / chain edits repaint via the store's own mutators;
+      // this branch covers entering compose mode and a new base image or
+      // engine change. Read those so the $effect re-runs on them.
+      void ui.preview;
+      void ui.original;
+      void ui.settings.backend;
+      composeStore.scheduleRender();
     } else {
       generatorStore.stopAnimation();
     }

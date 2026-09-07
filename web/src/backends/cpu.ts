@@ -13,6 +13,7 @@ import {
   renderNoiseField as wasmRenderNoiseField,
   renderNoiseFieldGIF as wasmRenderNoiseFieldGIF,
   renderGenerator as wasmRenderGenerator,
+  renderComposite as wasmRenderComposite,
   extractPalette as wasmExtractPalette,
   genPalette as wasmGenPalette,
   type FilterParams,
@@ -22,6 +23,7 @@ import {
   type GradientCSSOptions,
   type NoiseFieldParams,
   type GeneratorParams,
+  type ComposeSpec,
   type PaletteExtractOptions,
   type PaletteHarmonyOptions,
 } from "../wasm";
@@ -80,6 +82,14 @@ class CpuBackend implements FilterBackend {
     h: number,
   ): Promise<ImageData> {
     return wasmRenderGenerator(name, params, w, h);
+  }
+
+  async renderComposite(
+    base: ImageData | null,
+    spec: ComposeSpec,
+    extras: ImageData[],
+  ): Promise<ImageData> {
+    return wasmRenderComposite(base, spec, extras);
   }
 
   async extractPalette(img: ImageData, options: PaletteExtractOptions): Promise<string[]> {

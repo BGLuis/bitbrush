@@ -28,6 +28,18 @@ export function blitCanvas(target: HTMLCanvasElement, source: HTMLCanvasElement)
   ctx.drawImage(source, 0, 0);
 }
 
+/** Rasterise an <img> into ImageData via a throwaway canvas (never the
+ *  shared output canvas). Used to ingest extra compose-layer images. */
+export function imageElementToImageData(img: HTMLImageElement): ImageData {
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("2d context unavailable");
+  ctx.drawImage(img, 0, 0);
+  return ctx.getImageData(0, 0, c.width, c.height);
+}
+
 export async function loadImageFile(file: File): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(file);
   try {

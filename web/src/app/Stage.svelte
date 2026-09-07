@@ -4,6 +4,7 @@
   import GifPanel from "./gif/GifPanel.svelte";
   import { openFilePicker } from "./lib/image";
   import { generatorStore } from "./generator/generator-store.svelte";
+  import { composeStore } from "./compose/compose-store.svelte";
   import CanvasSpotsOverlay from "./generator/CanvasSpotsOverlay.svelte";
   import { viewState, zoomFit, zoomActual, nudgeZoom } from "./lib/view.svelte";
 
@@ -42,7 +43,9 @@
         ? "Gradiente + Ruído"
         : ui.mode === "palette"
           ? "Paleta"
-          : (effectByName(ui.effectName)?.title ?? ui.effectName),
+          : ui.mode === "compose"
+            ? "Compor"
+            : (effectByName(ui.effectName)?.title ?? ui.effectName),
   );
   const desc = $derived(
     ui.mode === "pattern"
@@ -51,8 +54,13 @@
         ? "Gradiente multi-stop (CSS Color 4) ou campo de ruído generativo — desenha direto no canvas."
         : ui.mode === "palette"
           ? "Extração por median-cut / k-means, ou geração por regra de harmonia."
-          : (DESCS[ui.effectName] ?? ""),
+          : ui.mode === "compose"
+            ? "Pilha de camadas — imagens, geradores, gradiente e ruído mesclados, cada um com sua cadeia de filtros."
+            : (DESCS[ui.effectName] ?? ""),
   );
+
+  // Compose with no base image uses the generator-style aspect-ratio frame.
+  const composeFramed = $derived(ui.mode === "compose" && ui.original === null);
 
   const canAnimate = $derived(
     (ui.mode === "generator" && generatorStore.generatorMode === "noise" && generatorStore.isOrganic) ||
@@ -110,14 +118,16 @@
   <div class="viewport" class:scroll={scrollable} bind:this={viewportEl}>
     <div
       class="canvas-frame"
-      class:generator-mode={ui.mode === "generator" || ui.mode === "pattern"}
+      class:generator-mode={ui.mode === "generator" || ui.mode === "pattern" || composeFramed}
       class:zoomed={framePx !== null}
       class:hidden={showEmpty}
       style={ui.mode === "generator" || ui.mode === "pattern"
         ? `--ar: ${generatorStore.ratio}; --arn: ${generatorStore.aspectRatio};`
-        : framePx
-          ? `width: ${framePx.w}px; height: ${framePx.h}px;`
-          : ""}
+        : composeFramed
+          ? `--ar: ${composeStore.ratio}; --arn: ${composeStore.aspectRatio};`
+          : framePx
+            ? `width: ${framePx.w}px; height: ${framePx.h}px;`
+            : ""}
     >
       <canvas bind:this={canvasEl}></canvas>
       {#if ui.mode === "generator" && generatorStore.generatorMode === "noise" && generatorStore.isOrganic}

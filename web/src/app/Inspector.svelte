@@ -3,6 +3,7 @@
   import ParamControls from "./ParamControls.svelte";
   import GeneratorPanel from "./generator/GeneratorPanel.svelte";
   import PatternPanel from "./generator/PatternPanel.svelte";
+  import ComposePanel from "./compose/ComposePanel.svelte";
   import { generatorStore } from "./generator/generator-store.svelte";
   import { panel } from "./lib/panel";
   import { makePalettePanel } from "./lib/wrapped";
@@ -33,6 +34,11 @@
       <h3>Gradiente + Ruído</h3>
     </div>
     <GeneratorPanel />
+  {:else if ui.mode === "compose"}
+    <div class="hd">
+      <h3>Compor</h3>
+    </div>
+    <ComposePanel />
   {:else}
     <div class="hd"><h3>Paleta</h3></div>
     <div class="wrapped" use:panel={makePalettePanel}></div>

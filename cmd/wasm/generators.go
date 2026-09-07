@@ -115,80 +115,9 @@ func gradientCSS(_ js.Value, args []js.Value) (result any) {
 	return map[string]any{"ok": true, "css": css, "error": ""}
 }
 
-var nfField = map[string]noisefield.Field{
-	"linear": noisefield.FieldLinear, "radial": noisefield.FieldRadial,
-	"conic": noisefield.FieldConic, "reflected": noisefield.FieldReflected,
-	"diamond": noisefield.FieldDiamond, "mesh": noisefield.FieldMesh,
-	"freeform": noisefield.FieldFreeform, "flow": noisefield.FieldFlow,
-}
-
-var nfStyle = map[string]noisefield.Style{
-	"metallic": noisefield.StyleMetallic, "chrome": noisefield.StyleChrome,
-	"iridescent": noisefield.StyleIridescent, "holographic": noisefield.StyleHolographic,
-	"neon": noisefield.StyleNeon, "pastel": noisefield.StylePastel,
-	"duotone": noisefield.StyleDuotone, "rainbow": noisefield.StyleRainbow,
-}
-
-var nfTexture = map[string]noisefield.Texture{
-	"smooth": noisefield.TextureSmooth, "grain": noisefield.TextureGrain,
-	"frosted": noisefield.TextureFrosted, "wave": noisefield.TextureWave,
-	"wrinkle": noisefield.TextureWrinkle, "paper": noisefield.TexturePaper,
-}
-
-func parseNoiseFieldParams(jsonStr string) (noisefield.Params, error) {
-	var p struct {
-		Field   string   `json:"field"`
-		Style   string   `json:"style"`
-		Texture string   `json:"texture"`
-		Stops   []string `json:"stops"`
-		Spots   []struct {
-			Color string  `json:"color"`
-			X     float64 `json:"x"`
-			Y     float64 `json:"y"`
-		} `json:"spots"`
-		Angle      float64 `json:"angle"`
-		Scale      float64 `json:"scale"`
-		Distortion float64 `json:"distortion"`
-		Seed       float64 `json:"seed"`
-		Time       float64 `json:"time"`
-	}
-	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil {
-		return noisefield.Params{}, fmt.Errorf("bad params: %w", err)
-	}
-
-	stops := make([]noisefield.RGB, 0, len(p.Stops))
-	for _, s := range p.Stops {
-		c, err := gradient.ParseHex(s)
-		if err != nil {
-			return noisefield.Params{}, fmt.Errorf("bad stop %q: %w", s, err)
-		}
-		stops = append(stops, noisefield.RGB{R: c.R, G: c.G, B: c.B})
-	}
-	spots := make([]noisefield.Spot, 0, len(p.Spots))
-	for _, s := range p.Spots {
-		c, err := gradient.ParseHex(s.Color)
-		if err != nil {
-			return noisefield.Params{}, fmt.Errorf("bad spot colour %q: %w", s.Color, err)
-		}
-		spots = append(spots, noisefield.Spot{Color: noisefield.RGB{R: c.R, G: c.G, B: c.B}, X: s.X, Y: s.Y})
-	}
-
-	return noisefield.Params{
-		Field:      nfField[p.Field],
-		Style:      nfStyle[p.Style],
-		Texture:    nfTexture[p.Texture],
-		Stops:      stops,
-		Spots:      spots,
-		AngleDeg:   p.Angle,
-		Scale:      p.Scale,
-		Distortion: p.Distortion,
-		Seed:       int64(math.Round(p.Seed)),
-		Time:       p.Time,
-	}, nil
-}
-
 // bitbrushRenderNoiseField(paramsJSON string, w int, h int) ->
-// {ok, data: Uint8Array|null, error}.
+// {ok, data: Uint8Array|null, error}. Param parsing (enum names, hex
+// colours) lives in internal/noisefield so the compositor can share it.
 func renderNoiseField(_ js.Value, args []js.Value) (result any) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -196,12 +125,10 @@ func renderNoiseField(_ js.Value, args []js.Value) (result any) {
 		}
 	}()
 
-	params, err := parseNoiseFieldParams(args[0].String())
+	img, err := noisefield.RenderJSON([]byte(args[0].String()), args[1].Int(), args[2].Int())
 	if err != nil {
 		return errData(err)
 	}
-
-	img := noisefield.Render(params, args[1].Int(), args[2].Int())
 	return okData(img.Pix)
 }
 
@@ -214,11 +141,11 @@ func renderNoiseFieldGIF(_ js.Value, args []js.Value) (result any) {
 		}
 	}()
 
-	startP, err := parseNoiseFieldParams(args[0].String())
+	startP, err := noisefield.ParseParams([]byte(args[0].String()))
 	if err != nil {
 		return errData(fmt.Errorf("bad start params: %w", err))
 	}
-	endP, err := parseNoiseFieldParams(args[1].String())
+	endP, err := noisefield.ParseParams([]byte(args[1].String()))
 	if err != nil {
 		return errData(fmt.Errorf("bad end params: %w", err))
 	}

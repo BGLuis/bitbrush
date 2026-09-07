@@ -5,6 +5,7 @@
 // (no Worker constructor, WASM blocked in workers, strict CSP).
 
 import { registerBackend, type FilterBackend } from "../backend";
+import { packImages } from "../wasm";
 import type {
   FilterParams,
   GifKeyframe,
@@ -13,6 +14,7 @@ import type {
   GradientCSSOptions,
   NoiseFieldParams,
   GeneratorParams,
+  ComposeSpec,
   PaletteExtractOptions,
   PaletteHarmonyOptions,
 } from "../wasm";
@@ -171,6 +173,32 @@ class WorkerBackend implements FilterBackend {
       width: w,
       height: h,
     });
+    return new ImageData(new Uint8ClampedArray(r.buf!), r.width!, r.height!);
+  }
+
+  async renderComposite(
+    base: ImageData | null,
+    spec: ComposeSpec,
+    extras: ImageData[],
+  ): Promise<ImageData> {
+    const baseCopy = base ? base.data.slice() : null; // don't neuter the caller's ImageData
+    const { buf, dims } = packImages(extras);
+    const transfer: Transferable[] = [];
+    if (baseCopy) transfer.push(baseCopy.buffer);
+    if (buf.byteLength) transfer.push(buf.buffer);
+    const r = await this.#sendPinned(
+      {
+        op: "composite",
+        base: baseCopy ? baseCopy.buffer : null,
+        baseWidth: base?.width ?? 0,
+        baseHeight: base?.height ?? 0,
+        spec: JSON.stringify(spec),
+        extras: buf.buffer,
+        extrasByteLength: buf.byteLength,
+        dims: JSON.stringify(dims),
+      },
+      transfer,
+    );
     return new ImageData(new Uint8ClampedArray(r.buf!), r.width!, r.height!);
   }
 

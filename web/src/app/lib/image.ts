@@ -32,8 +32,11 @@ export async function loadFile(file: File): Promise<void> {
     return;
   }
   // Generator / pattern modes drive the canvas themselves — hand control back
-  // to the filter path so the dropped image actually shows.
-  if (ui.mode !== "filter" && ui.mode !== "palette") ui.mode = "filter";
+  // to the filter path so the dropped image actually shows. Compose keeps
+  // control: the dropped image becomes its base-image source.
+  if (ui.mode !== "filter" && ui.mode !== "palette" && ui.mode !== "compose") {
+    ui.mode = "filter";
+  }
   try {
     const img = await loadImageFile(file);
     const canvas = refs.canvas;

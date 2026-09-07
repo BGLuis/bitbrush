@@ -1,7 +1,19 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { loadFile } from "./lib/image";
+  import { ui } from "./store.svelte";
+  import { composeStore } from "./compose/compose-store.svelte";
   import { showToast } from "./lib/toast.svelte";
+
+  // In compose mode, dropping onto a selected image layer fills that layer;
+  // otherwise the drop becomes the base image (loadFile).
+  function routeFile(file: File): void {
+    if (ui.mode === "compose" && composeStore.wantsImageDrop()) {
+      void composeStore.addImageForSelectedLayer(file);
+      return;
+    }
+    void loadFile(file);
+  }
 
   // Drop an image anywhere on the window, or paste one from the clipboard.
   // `depth` counts dragenter/dragleave so the overlay doesn't flicker as the
@@ -40,7 +52,7 @@
     const file = Array.from(e.dataTransfer?.files ?? []).find((f) =>
       f.type.startsWith("image/"),
     );
-    if (file) void loadFile(file);
+    if (file) routeFile(file);
     else showToast("Nenhuma imagem no que foi solto", "error");
   }
 
@@ -53,7 +65,7 @@
       ?.getAsFile();
     if (file) {
       e.preventDefault();
-      void loadFile(file);
+      routeFile(file);
     }
   }
 

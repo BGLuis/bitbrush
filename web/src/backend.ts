@@ -19,6 +19,7 @@ import type {
   GeneratorParams,
   PaletteExtractOptions,
   PaletteHarmonyOptions,
+  ComposeSpec,
 } from "./wasm";
 
 export type BackendKind = "cpu" | "cpu-worker" | "gpu";
@@ -66,6 +67,16 @@ export interface FilterBackend {
   ): Promise<Uint8Array>;
   /** Render a named algorithmic generator (internal/generators registry). */
   renderGenerator(name: string, params: GeneratorParams, w: number, h: number): Promise<ImageData>;
+  /**
+   * Composite an ordered layer stack (internal/compositor, "Compor" mode).
+   * base is the primary image or null; extras[i] backs the i-th image layer.
+   * Runs on the CPU core — one boundary crossing per render.
+   */
+  renderComposite(
+    base: ImageData | null,
+    spec: ComposeSpec,
+    extras: ImageData[],
+  ): Promise<ImageData>;
   /** Extract a palette from an image (internal/palette). */
   extractPalette(img: ImageData, options: PaletteExtractOptions): Promise<string[]>;
   /** Generate a harmony palette from a base colour. */

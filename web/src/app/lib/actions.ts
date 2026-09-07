@@ -6,7 +6,9 @@ import { effects } from "../../ui/controls";
 import { getBackend } from "../../backend";
 import { ui, refs, selectEffect } from "../store.svelte";
 import { generatorStore } from "../generator/generator-store.svelte";
+import { composeStore } from "../compose/compose-store.svelte";
 import { openFilePicker } from "./image";
+import { downloadCanvas } from "./download";
 import { showToast } from "./toast.svelte";
 
 type StatusFn = (label: string | null) => void;
@@ -29,23 +31,13 @@ export function copyShareLink(onStatus?: StatusFn): void {
   setTimeout(() => onStatus?.(null), 1400);
 }
 
-function downloadCanvas(canvas: HTMLCanvasElement, filename: string): void {
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 15_000);
-  }, "image/png");
-}
-
 export async function exportPNG(onStatus?: StatusFn): Promise<void> {
   if (ui.mode === "generator" || ui.mode === "pattern") {
     void generatorStore.exportHighResPNG();
+    return;
+  }
+  if (ui.mode === "compose") {
+    void composeStore.exportPNG();
     return;
   }
 

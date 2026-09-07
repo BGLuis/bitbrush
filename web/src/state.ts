@@ -29,16 +29,61 @@ export interface GeneratorURLState {
   patternParams?: Record<string, any>;
 }
 
+export interface ComposeLayerRecipe {
+  source: string; // "base" | "img" | "gen:NAME" | "grad" | "noise"
+  enabled?: boolean;
+  blend?: string;
+  opacity?: number;
+  fit?: string;
+  genParams?: Record<string, any>;
+  chain?: Array<{ filter: string; params: Record<string, any> }>;
+}
+
+export interface ComposeURLState {
+  ratio?: string;
+  layers: ComposeLayerRecipe[];
+}
+
 export interface URLState {
-  mode: "filter" | "pattern" | "generator" | "palette";
+  mode: "filter" | "pattern" | "generator" | "palette" | "compose";
   effect: string | null;
   params: FilterParams;
   generator?: GeneratorURLState;
+  compose?: ComposeURLState;
 }
 
 export function readStateFromURL(): URLState {
   const q = new URLSearchParams(location.search);
   const rawMode = q.get(MODE_KEY);
+
+  if (rawMode === "compose" || q.has("cs")) {
+    let layers: ComposeLayerRecipe[] = [];
+    const raw = q.get("cs");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw) as Array<Record<string, any>>;
+        layers = parsed.map((e) => ({
+          source: typeof e.s === "string" ? e.s : "base",
+          enabled: e.e === undefined ? true : Boolean(e.e),
+          blend: typeof e.b === "string" ? e.b : undefined,
+          opacity: typeof e.o === "number" ? e.o : undefined,
+          fit: typeof e.f === "string" ? e.f : undefined,
+          genParams: e.p && typeof e.p === "object" ? e.p : undefined,
+          chain: Array.isArray(e.c)
+            ? e.c.map((c: any) => ({ filter: String(c[0]), params: c[1] ?? {} }))
+            : [],
+        }));
+      } catch {
+        layers = [];
+      }
+    }
+    return {
+      mode: "compose",
+      effect: null,
+      params: {},
+      compose: { ratio: q.get("ar") || undefined, layers },
+    };
+  }
 
   if (rawMode === "pattern" || rawMode === "generator" || q.has("gen") || q.has("field") || q.has("pattern")) {
     const rawTool = q.get("tool");
@@ -228,6 +273,32 @@ export function writeGeneratorStateToURL(state: GeneratorURLState, immediate = f
     }
   }
 }
+
+  const url = `${location.pathname}?${q.toString()}${location.hash}`;
+  debouncedReplaceState(url, immediate);
+}
+
+// Writes the "Compor" layer stack to the URL as one compact `cs=` param
+// (a flat p.<key> scheme can't nest an ordered layer list with per-layer
+// chains). Default-valued keys are omitted to keep the recipe short.
+// Uploaded-image bytes never travel: an "img" layer round-trips its recipe
+// (blend / opacity / fit / chain) but comes back needing a re-drop.
+export function writeComposeStateToURL(state: ComposeURLState, immediate = false): void {
+  const q = new URLSearchParams();
+  q.set(MODE_KEY, "compose");
+  if (state.ratio) q.set("ar", state.ratio);
+
+  const cs = state.layers.map((L) => {
+    const e: Record<string, unknown> = { s: L.source };
+    if (L.blend && L.blend !== "normal") e.b = L.blend;
+    if (typeof L.opacity === "number" && L.opacity !== 1) e.o = Number(L.opacity.toFixed(3));
+    if (L.enabled === false) e.e = 0;
+    if (L.fit && L.fit !== "cover") e.f = L.fit;
+    if (L.genParams && Object.keys(L.genParams).length) e.p = L.genParams;
+    if (L.chain && L.chain.length) e.c = L.chain.map((c) => [c.filter, c.params]);
+    return e;
+  });
+  q.set("cs", JSON.stringify(cs));
 
   const url = `${location.pathname}?${q.toString()}${location.hash}`;
   debouncedReplaceState(url, immediate);

@@ -63,6 +63,17 @@ self.onmessage = async (e) => {
       self.postMessage({ id: req.id, ok: true, buf: r.data.buffer, width: req.width, height: req.height }, [r.data.buffer]);
       return;
     }
+    if (req.op === "composite") {
+      const base = req.base ? new Uint8Array(req.base) : null;
+      const extras =
+        req.extras && req.extrasByteLength
+          ? new Uint8Array(req.extras, 0, req.extrasByteLength)
+          : new Uint8Array(0);
+      const r = bitbrushRenderComposite(base, req.baseWidth, req.baseHeight, req.spec, extras, req.dims);
+      if (!r.ok || !r.data) throw new Error(r.error || "composite failed");
+      self.postMessage({ id: req.id, ok: true, buf: r.data.buffer, width: r.width, height: r.height }, [r.data.buffer]);
+      return;
+    }
     if (req.op === "gradientCSS") {
       const r = bitbrushGradientCSS(req.params, req.options);
       if (!r.ok) throw new Error(r.error || "gradient css failed");

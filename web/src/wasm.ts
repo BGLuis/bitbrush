@@ -63,6 +63,14 @@ declare global {
   function bitbrushGenPalette(
     optionsJSON: string,
   ): { ok: boolean; colors: string[]; error: string };
+  function bitbrushRenderComposite(
+    baseRGBA: Uint8Array | null,
+    baseW: number,
+    baseH: number,
+    specJSON: string,
+    extrasRGBA: Uint8Array,
+    extrasDimsJSON: string,
+  ): { ok: boolean; data: Uint8Array | null; width: number; height: number; error: string };
 }
 
 export interface GradientStop {
@@ -288,4 +296,90 @@ export function genPalette(options: PaletteHarmonyOptions): string[] {
   const res = bitbrushGenPalette(JSON.stringify(options));
   if (!res.ok) throw new Error(res.error || "palette generate failed");
   return res.colors;
+}
+
+// --- compositor (internal/compositor) — the "Compor" layer stack ---
+
+export type BlendMode =
+  | "normal"
+  | "multiply"
+  | "screen"
+  | "overlay"
+  | "darken"
+  | "lighten"
+  | "color-dodge"
+  | "color-burn"
+  | "hard-light"
+  | "soft-light"
+  | "difference"
+  | "exclusion"
+  | "linear-dodge"
+  | "subtract";
+
+export type LayerSource = "base" | "image" | "generator" | "gradient" | "noisefield";
+
+export type FitMode = "cover" | "contain" | "stretch" | "center" | "tile";
+
+/** One entry in a layer's own ordered filter chain. */
+export interface ComposeStage {
+  filter: string;
+  params: FilterParams;
+}
+
+export interface ComposeLayer {
+  enabled: boolean;
+  source: LayerSource;
+  imageIndex?: number; // source === "image"
+  generator?: string; // source === "generator"
+  genParams?: Record<string, unknown>; // generator / gradient / noisefield params
+  fit?: FitMode; // default "cover"
+  chain: ComposeStage[];
+  blend: BlendMode;
+  opacity: number; // 0..1
+}
+
+export interface ComposeSpec {
+  width: number;
+  height: number;
+  layers: ComposeLayer[];
+}
+
+/** Concatenate image-layer buffers into one Uint8Array plus a [w,h] list,
+ *  the shape bitbrushRenderComposite expects for its extras argument. */
+export function packImages(imgs: ImageData[]): { buf: Uint8Array; dims: [number, number][] } {
+  const dims: [number, number][] = imgs.map((im) => [im.width, im.height]);
+  const total = imgs.reduce((n, im) => n + im.data.byteLength, 0);
+  const buf = new Uint8Array(total);
+  let off = 0;
+  for (const im of imgs) {
+    buf.set(new Uint8Array(im.data.buffer, im.data.byteOffset, im.data.byteLength), off);
+    off += im.data.byteLength;
+  }
+  return { buf, dims };
+}
+
+/** Composite a layer stack. base is the primary image (or null); extras[i]
+ *  backs a layer whose source is "image" and imageIndex is i. One boundary
+ *  crossing: Go renders every generator/gradient/noise layer itself. */
+export function renderComposite(
+  base: ImageData | null,
+  spec: ComposeSpec,
+  extras: ImageData[] = [],
+): ImageData {
+  const { buf, dims } = packImages(extras);
+  const baseBytes = base
+    ? new Uint8Array(base.data.buffer, base.data.byteOffset, base.data.byteLength)
+    : null;
+  const res = bitbrushRenderComposite(
+    baseBytes,
+    base?.width ?? 0,
+    base?.height ?? 0,
+    JSON.stringify(spec),
+    buf,
+    JSON.stringify(dims),
+  );
+  if (!res.ok || !res.data) throw new Error(res.error || "composite failed");
+  const w = res.width || spec.width || base?.width || 0;
+  const h = res.height || spec.height || base?.height || 0;
+  return new ImageData(new Uint8ClampedArray(res.data), w, h);
 }

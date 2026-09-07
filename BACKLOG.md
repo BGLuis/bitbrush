@@ -78,6 +78,33 @@ para um resultado ser compartilhável e reproduzível"*.
 
 ---
 
+## "Compor" (modo layer stack) — pontas soltas
+
+O núcleo (`internal/compositor`), a global `bitbrushRenderComposite`, o seam de backend, a
+store/URL/loop e a UI (`app/compose/`) estão **feitos e verificados** (22 testes em
+`go test ./internal/compositor`, preview vivo e hidratação por link testados no navegador).
+Adiado:
+
+- **Export GIF de uma pilha.** `Stage.svelte` só monta `<GifPanel>` em `filter`/`generator`.
+  Animar a pilha exige `anim.RenderCompose(specStart, specEnd, opts)` + UI de keyframe
+  ciente do modo compose.
+- **Editores completos de gradiente / ruído por camada.** `LayerEditor` expõe um subconjunto
+  (gradiente: 2 cores + espaço + ângulo; ruído: campo/estilo/textura/seed/escala/distorção/
+  ângulo + 2 cores). Falta paridade com `GeneratorPanel` (multi-stop, easing, spots) — ou um
+  hand-off "editar no modo Gerador e adicionar como camada".
+- **Modos de blend não-separáveis** (`hue` / `saturation` / `color` / `luminosity`). v1 traz
+  os 14 separáveis; os 4 restantes usam `Lum`/`ClipColor`/`SetLum` do W3C — um braço de
+  `switch` cada em `blend.go`.
+- **`ui.query` (status bar "Receita") atrasa uma interação** ao entrar em compose/generator —
+  `writeComposeStateToURL` usa `debouncedReplaceState` (300ms) e `ui.query` lê `location.search`
+  antes do flush. Cosmético; idêntico ao comportamento atual do modo gerador.
+- **Bloat de URL** em pilhas profundas: `cs=` já omite chaves default; um `cz=` com
+  `CompressionStream` é o próximo passo se necessário.
+- **Backend GPU** delega `renderComposite` ao core Go; a store já força worker/CPU quando o
+  motor é `gpu`, então `auto` não é afetado.
+
+---
+
 ## Adiado por decisão explícita (não são falhas)
 
 - **TinyGo** — otimização de tamanho planejada (`CLAUDE.md` › *Toolchain decisions*):
