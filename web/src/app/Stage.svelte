@@ -5,28 +5,24 @@
   import { openFilePicker } from "./lib/image";
   import { generatorStore } from "./generator/generator-store.svelte";
   import CanvasSpotsOverlay from "./generator/CanvasSpotsOverlay.svelte";
+  import { viewState, zoomFit, zoomActual, nudgeZoom } from "./lib/view.svelte";
 
   let canvasEl: HTMLCanvasElement;
+  let viewportEl: HTMLDivElement | undefined = $state();
 
   onMount(() => {
     refs.canvas = canvasEl;
-
-    const handleKeydown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && canAnimate) {
-        const activeTag = (document.activeElement?.tagName || "").toLowerCase();
-        if (activeTag === "input" || activeTag === "textarea" || activeTag === "select") {
-          return;
-        }
-        e.preventDefault();
-        generatorStore.toggleAnimation();
-      }
+    // Ctrl/⌘ + wheel zooms the canvas; plain wheel scrolls when zoomed in.
+    const wheel = (e: WheelEvent) => {
+      if (ui.mode !== "filter" || ui.original === null) return;
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      nudgeZoom(e.deltaY < 0 ? 1 : -1);
     };
-
-    window.addEventListener("keydown", handleKeydown);
-
+    viewportEl?.addEventListener("wheel", wheel, { passive: false });
     return () => {
       refs.canvas = null;
-      window.removeEventListener("keydown", handleKeydown);
+      viewportEl?.removeEventListener("wheel", wheel);
     };
   });
 
@@ -65,6 +61,17 @@
 
   const needsImage = $derived(ui.mode === "filter" || ui.mode === "palette");
   const showEmpty = $derived(needsImage && ui.original === null);
+
+  // --- Canvas zoom / scroll (filter mode) -------------------------------------
+  const zoomable = $derived(ui.mode === "filter" && ui.original !== null);
+  const nat = $derived(ui.preview ? { w: ui.preview.width, h: ui.preview.height } : null);
+  const scrollable = $derived(zoomable && !viewState.fit);
+  const framePx = $derived(
+    nat && !viewState.fit
+      ? { w: Math.round(nat.w * viewState.scale), h: Math.round(nat.h * viewState.scale) }
+      : null,
+  );
+  const zoomLabel = $derived(viewState.fit ? "Ajustar" : `${Math.round(viewState.scale * 100)}%`);
 </script>
 
 <section class="stage">
@@ -85,17 +92,32 @@
         <span>{generatorStore.animate ? "Pausar" : "Animar"}</span>
         <kbd>Espaço</kbd>
       </button>
+    {:else if zoomable}
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button type="button" onclick={() => nudgeZoom(-1)} title="Menos zoom (Ctrl/⌘ −)" aria-label="Menos zoom">−</button>
+        <button
+          type="button"
+          class="lvl"
+          onclick={() => (viewState.fit ? zoomActual() : zoomFit())}
+          title="Alternar entre ajustar à janela e 100% (Ctrl/⌘ 0)"
+        >{zoomLabel}</button>
+        <button type="button" onclick={() => nudgeZoom(1)} title="Mais zoom (Ctrl/⌘ +)" aria-label="Mais zoom">+</button>
+        <button type="button" class="fitbtn" class:on={viewState.fit} onclick={zoomFit} title="Ajustar à janela">⤢</button>
+      </div>
     {/if}
   </header>
 
-  <div class="viewport">
+  <div class="viewport" class:scroll={scrollable} bind:this={viewportEl}>
     <div
       class="canvas-frame"
       class:generator-mode={ui.mode === "generator" || ui.mode === "pattern"}
+      class:zoomed={framePx !== null}
       class:hidden={showEmpty}
       style={ui.mode === "generator" || ui.mode === "pattern"
         ? `--ar: ${generatorStore.ratio}; --arn: ${generatorStore.aspectRatio};`
-        : ""}
+        : framePx
+          ? `width: ${framePx.w}px; height: ${framePx.h}px;`
+          : ""}
     >
       <canvas bind:this={canvasEl}></canvas>
       {#if ui.mode === "generator" && generatorStore.generatorMode === "noise" && generatorStore.isOrganic}
@@ -137,15 +159,20 @@
     align-items: baseline;
     gap: 14px;
     min-width: 0;
+    overflow: hidden;
   }
   .t {
     font-family: var(--disp);
     font-weight: 600;
     font-size: 15px;
+    flex: none;
   }
   .d {
     color: var(--mute);
     font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .play-toggle-btn {
     display: inline-flex;
@@ -182,6 +209,39 @@
     color: var(--mute, #888);
     font-family: var(--mono, monospace);
   }
+  .zoom {
+    display: inline-flex;
+    align-items: stretch;
+    flex: none;
+    border: 1px solid var(--line-soft);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--s2);
+  }
+  .zoom button {
+    border: 0;
+    background: transparent;
+    color: var(--dim);
+    font-size: 13px;
+    padding: 4px 9px;
+    cursor: pointer;
+    min-width: 28px;
+  }
+  .zoom button + button {
+    border-left: 1px solid var(--line-soft);
+  }
+  .zoom button:hover {
+    background: var(--s3);
+    color: var(--text);
+  }
+  .zoom .lvl {
+    font-family: var(--mono);
+    font-size: 11px;
+    min-width: 62px;
+  }
+  .zoom .fitbtn.on {
+    color: var(--accent);
+  }
   .viewport {
     flex: 1;
     min-height: 0;
@@ -190,6 +250,7 @@
     align-items: center;
     justify-content: center;
     padding: 24px;
+    overflow: hidden;
     background:
       conic-gradient(
           from 90deg at 50% 50%,
@@ -200,6 +261,11 @@
         )
         0 0 / 22px 22px;
   }
+  .viewport.scroll {
+    overflow: auto;
+    align-items: safe center;
+    justify-content: safe center;
+  }
   .canvas-frame {
     position: relative;
     max-width: 100%;
@@ -207,6 +273,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
+  }
+  .canvas-frame.zoomed {
+    flex: none;
+    max-width: none;
+    max-height: none;
+  }
+  .canvas-frame.zoomed canvas {
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
   }
   .canvas-frame.generator-mode {
     aspect-ratio: var(--ar, 16/9);

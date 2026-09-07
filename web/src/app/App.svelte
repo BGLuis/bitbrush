@@ -4,6 +4,9 @@
   import Stage from "./Stage.svelte";
   import Inspector from "./Inspector.svelte";
   import Statusbar from "./Statusbar.svelte";
+  import DropZone from "./DropZone.svelte";
+  import KeyboardShortcuts from "./KeyboardShortcuts.svelte";
+  import Toast from "./Toast.svelte";
   import { ui, refs } from "./store.svelte";
   import { scheduleFilterRender } from "./lib/render";
   import { writeStateToURL } from "../state";
@@ -45,6 +48,10 @@
   </main>
   <Statusbar />
 </div>
+
+<DropZone />
+<KeyboardShortcuts />
+<Toast />
 
 <style>
   .shell {

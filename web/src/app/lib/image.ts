@@ -5,6 +5,8 @@
 import { loadImageFile, drawImageToCanvas } from "../../canvas";
 import { downscaleImageData } from "../../preview";
 import { ui, refs } from "../store.svelte";
+import { showToast } from "./toast.svelte";
+import { zoomFit } from "./view.svelte";
 
 let input: HTMLInputElement | null = null;
 
@@ -25,11 +27,25 @@ export function openFilePicker(): void {
 }
 
 export async function loadFile(file: File): Promise<void> {
-  const img = await loadImageFile(file);
-  const canvas = refs.canvas;
-  if (!canvas) return;
-  ui.original = drawImageToCanvas(canvas, img);
-  ui.preview = downscaleImageElement(img, ui.settings.previewMaxDim);
+  if (!file.type.startsWith("image/")) {
+    showToast(`"${file.name}" não é uma imagem`, "error");
+    return;
+  }
+  // Generator / pattern modes drive the canvas themselves — hand control back
+  // to the filter path so the dropped image actually shows.
+  if (ui.mode !== "filter" && ui.mode !== "palette") ui.mode = "filter";
+  try {
+    const img = await loadImageFile(file);
+    const canvas = refs.canvas;
+    if (!canvas) return;
+    ui.original = drawImageToCanvas(canvas, img);
+    ui.preview = downscaleImageElement(img, ui.settings.previewMaxDim);
+    zoomFit();
+    showToast(`${img.naturalWidth}×${img.naturalHeight} · ${file.name}`);
+  } catch (err) {
+    console.error(err);
+    showToast("Não foi possível decodificar a imagem", "error");
+  }
 }
 
 function downscaleImageElement(img: HTMLImageElement, maxDim: number): ImageData {

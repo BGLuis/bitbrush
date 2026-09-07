@@ -1,12 +1,14 @@
 <script lang="ts">
   import { ui } from "./store.svelte";
-  import { refs } from "./store.svelte";
   import { openFilePicker, recomputePreview } from "./lib/image";
   import { panel } from "./lib/panel";
   import { renderSettings } from "../settings";
+  import { exportPNG, copyShareLink } from "./lib/actions";
 
-  import { getBackend } from "../backend";
   import { generatorStore } from "./generator/generator-store.svelte";
+
+  const IS_MAC = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
+  const MOD = IS_MAC ? "⌘" : "Ctrl";
 
   let settingsOpen = $state(false);
   let shareLabel = $state("Compartilhar");
@@ -33,56 +35,11 @@
   }
 
   function share() {
-    void navigator.clipboard?.writeText(location.href);
-    shareLabel = "Link copiado!";
-    setTimeout(() => (shareLabel = "Compartilhar"), 1400);
+    copyShareLink((label) => (shareLabel = label ?? "Compartilhar"));
   }
 
-  function downloadCanvas(canvas: HTMLCanvasElement, filename: string) {
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 15_000);
-    }, "image/png");
-  }
-
-  async function exportPng() {
-    if (ui.mode === "generator" || ui.mode === "pattern") {
-      void generatorStore.exportHighResPNG();
-      return;
-    }
-
-    const src = ui.original ?? ui.preview;
-    if (!src) {
-      const canvas = refs.canvas;
-      if (!canvas) return;
-      downloadCanvas(canvas, `bitbrush-${ui.mode}.png`);
-      return;
-    }
-
-    exportLabel = "Processando...";
-    try {
-      const backend = await getBackend(ui.settings.backend);
-      const out = await backend.applyFilter(ui.effectName, src, ui.params);
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = out.width;
-      tempCanvas.height = out.height;
-      const ctx = tempCanvas.getContext("2d")!;
-      ctx.putImageData(out, 0, 0);
-      downloadCanvas(tempCanvas, `bitbrush-${ui.effectName}-${out.width}x${out.height}.png`);
-      exportLabel = "✓ Salvo!";
-      setTimeout(() => (exportLabel = "Exportar PNG"), 1500);
-    } catch (err) {
-      console.error(err);
-      exportLabel = "Erro ao exportar";
-      setTimeout(() => (exportLabel = "Exportar PNG"), 2000);
-    }
+  function exportPng() {
+    void exportPNG((label) => (exportLabel = label ?? "Exportar PNG"));
   }
 </script>
 
@@ -91,14 +48,14 @@
   <div class="pill" title="Receita reproduzível — viaja na URL">{recipe}</div>
 
   <div class="right">
-    <button class="btn" onclick={openFilePicker}>
+    <button class="btn" onclick={openFilePicker} title={`Carregar imagem  (${MOD}+O — ou arraste / cole)`}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <path d="M12 15V3M8 7l4-4 4 4M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4" />
       </svg>
       Carregar imagem
     </button>
-    <button class="btn" onclick={share}>{shareLabel}</button>
-    <button class="btn" onclick={exportPng}>
+    <button class="btn" onclick={share} title={`Copiar link da receita  (${MOD}+⇧+C)`}>{shareLabel}</button>
+    <button class="btn" onclick={exportPng} title={`Exportar PNG  (${MOD}+S)`}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <path d="M12 3v12M8 11l4 4 4-4M4 21h16" />
       </svg>

@@ -105,6 +105,14 @@ localStorage pref, *not* URL state); exports always run on the full-resolution o
 coalesced job to `app/lib/render.ts`. Filter params render from the `ui/controls.ts` descriptors
 via `app/ParamControls.svelte` (the Svelte port of the old `ui/panel.ts`).
 
+`App.svelte` also mounts three global-overlay siblings: `DropZone.svelte` (window-level
+drag-and-drop + clipboard paste of an image → `app/lib/image.ts`), `KeyboardShortcuts.svelte`
+(the `keydown` map + the `?` help sheet), and `Toast.svelte` (transient notices via
+`app/lib/toast.svelte.ts`). Shared top-bar actions (export PNG, copy share link, cycle effect)
+live in `app/lib/actions.ts` so both the Topbar buttons and the shortcuts call one path.
+`app/lib/view.svelte.ts` holds the filter-mode canvas zoom (`fit` vs an explicit scale);
+`Stage.svelte` reads it to size the canvas frame and let the viewport scroll when zoomed in.
+
 The three hand-built imperative panels — `gif.ts`, `generators-panel.ts`, `palette-panel.ts`
 (with `ui/widgets.ts`) — are **unchanged**: they still return `{ element }` and are hosted by
 the `app/lib/panel.ts` Svelte action (factories in `app/lib/wrapped.ts`). Migrating one to a
@@ -198,14 +206,19 @@ web/                    Vite + Svelte 5 project
     generators-panel.ts gradient / noise-field panel   (imperative, wrapped)
     palette-panel.ts    palette extraction + harmony   (imperative, wrapped)
     app/                the Svelte "Estúdio" shell
-      App.svelte        3-zone layout + the live filter $effect
+      App.svelte        3-zone layout + the live filter $effect + overlay siblings
       store.svelte.ts   `ui` runes state + `refs.canvas`
       Topbar/ToolRail/Stage/Inspector/Statusbar.svelte
       ParamControls.svelte   descriptor -> live form (was ui/panel.ts)
+      DropZone.svelte   window drag-and-drop + clipboard paste of an image
+      KeyboardShortcuts.svelte  keydown map + the `?` help sheet
+      Toast.svelte      transient notices (lib/toast.svelte.ts store)
       lib/render.ts     rAF-coalesced, seq-guarded filter render
       lib/panel.ts      action hosting an imperative `{ element }` panel
       lib/wrapped.ts    factories for the three wrapped panels
       lib/image.ts      file load + preview downscale, wired to `ui`
+      lib/actions.ts    shared top-bar actions (export PNG / share link / cycle effect)
+      lib/view.svelte.ts  filter-mode canvas zoom / scroll state
   public/               main.wasm, wasm_exec.js  (build outputs — gitignored)
   dist/                 static deploy output
 Makefile                canonical entrypoints
