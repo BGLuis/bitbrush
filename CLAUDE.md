@@ -19,13 +19,26 @@ any output can be reproduced from its parameters alone.
 v1 scope:
 
 - Image filters: coloured ASCII art, pixelate (8-bit), dithering (error-diffusion —
-  Floyd–Steinberg / Atkinson / Stucki / Jarvis / Sierra / Burkes — plus an ordered Bayer mode),
+  Floyd–Steinberg / Atkinson / Stucki / Jarvis / Sierra / Sierra-Lite / Burkes — plus ordered
+  modes: Bayer 2/4/8/16, clustered-dot, radial, H/V/diagonal lines, white-noise, void-and-cluster
+  blue-noise from `bluenoise.go`; `palette` mode also takes named retro palettes from
+  `palettes.go` — Game Boy / CGA / PICO-8 / C64 / NES / greys / 3-bit / sepia),
   Sobel edge detection, glitch / RGB shift, colour quantization (poster), halftone (AM screen,
   mono / CMYK / RGB), Voronoi stippling (`stipple`, uses `internal/voronoi`), `grayscale`
   (black & white — weighted / linear-light / HSL tone, brightness·contrast, 1-bit threshold),
   `paper` (print onto procedurally textured / aged paper — fibre grain, mottling, vignette),
   `pencil` (black-graphite dodge sketch + diagonal hatching; `internal/filters` value noise
   from `noise.go`).
+- ascii-magic.com parity filters (all registry filters, dispatched by name, no adapter change):
+  `blocks` (Unicode-block glyphs, procedural), `glyphscreen` (cross / diagonal / diamond / line
+  screens), `mosaic` (average-colour tiles + grout + palette), `pixelart` (cell grid + retro
+  palette / per-channel bit-depth + seam outline), `lego` (studded posterised bricks), `voxel`
+  (isometric per-face-shaded cubes). Post-processing filters, chainable in "Compor":
+  `vignette`, `scanlines`, `crt` (barrel warp + phosphor mask + scanlines + vignette),
+  `chromatic` (radial aberration), `blur` (separable box / 3-pass gaussian — `boxBlur` in
+  `imgproc.go`), `bloom` (bright-pass → blur → screen), `grain` (seeded hash noise), `dust`
+  (seeded specks + scratches), `coloroverlay` (flat colour × blend mode). Shared image helpers
+  `bilinearSample` / `boxBlur` / `smoothstep` live in `imgproc.go`.
 - Algorithmic generators — `internal/generators` registry + `internal/genall` link aggregator,
   each generator a self-registering package: `truchet` (multi-scale Truchet tiles),
   `harmonograph` (damped-sinusoid figure), `attractor` (De Jong / Clifford / Svensson density
@@ -196,7 +209,8 @@ URL-encodable so a result is shareable and reproducible.
 cmd/wasm/main.go        syscall/js adapter — filters, ascii, gif (+ decodeImageFresh/List helpers)
 cmd/wasm/generators.go  syscall/js adapter — gradient / noisefield / palette / generator globals
 cmd/wasm/compositor.go  syscall/js adapter — bitbrushRenderComposite (the "Compor" layer stack)
-internal/filters/       the image filters + registry (incl. halftone, stipple, dither kernels)
+internal/filters/       the image filters + registry (incl. halftone, stipple, dither kernels,
+                        the ascii-magic parity set, retro palettes.go, void-and-cluster bluenoise.go)
 internal/compositor/    layer-stack evaluator — blend modes + source-over + per-layer filter chain
 internal/anim/          keyframe param interpolation + multi-frame render + animated GIF encode
 internal/gradient/      multi-stop gradient sampling, easing curves, CSS emission

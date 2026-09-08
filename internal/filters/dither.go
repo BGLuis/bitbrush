@@ -106,7 +106,11 @@ func ditherPalette(src, dst *image.RGBA, w, h int, serpentine bool, p Params) (*
 	}
 	k := diffKernelFor(p.String("kernel", "floyd-steinberg"))
 
-	pal := palette.MedianCut(src, n)
+	// A named retro palette overrides the median-cut count entirely.
+	pal := namedPalette(p.String("palette", "custom"))
+	if pal == nil {
+		pal = palette.MedianCut(src, n)
+	}
 	if len(pal) == 0 {
 		return cloneRGBA(src), nil // fully transparent source, nothing to dither
 	}
@@ -124,25 +128,24 @@ func ditherPalette(src, dst *image.RGBA, w, h int, serpentine bool, p Params) (*
 	return dst, nil
 }
 
-// ditherOrdered thresholds each pixel against a normalised Bayer matrix. No
-// error is carried between pixels, so the result is position-deterministic
-// and free of the directional trails diffusion leaves.
+// ditherOrdered thresholds each pixel against a fixed position-dependent
+// map — a Bayer matrix, a clustered-dot / radial / line matrix, or a
+// white- or blue-noise tile. No error is carried between pixels, so the
+// result is position-deterministic and free of the directional trails
+// diffusion leaves.
 func ditherOrdered(src, dst *image.RGBA, w, h int, p Params) (*image.RGBA, error) {
 	levels := clampLevels(p.Int("levels", 2))
 	quant := levelQuant(levels)
-	n := bayerSize(p.String("matrix", "4"))
-	m := bayerMatrix(n) // flat n*n, row-major
-	mask := n - 1       // n is 2/4/8, so x%n == x&mask
-	// Spread one quantisation step across the matrix's [-0.5, 0.5) range.
+	thresh := orderedThreshold(p.String("pattern", "bayer"), p.String("matrix", "4"), p.Int("seed", 0))
+	// Spread one quantisation step across the map's [-0.5, 0.5) range.
 	amp := 255.0 / float64(levels-1)
 
 	if p.Bool("grayscale", true) {
 		plane, _, _ := lumaPlane(src)
 		for y := 0; y < h; y++ {
-			mr := (y & mask) * n
 			row := y * w
 			for x := 0; x < w; x++ {
-				plane[row+x] = quant(plane[row+x] + (m[mr+(x&mask)]-0.5)*amp)
+				plane[row+x] = quant(plane[row+x] + (thresh(x, y)-0.5)*amp)
 			}
 		}
 		writeGrayPlane(dst, src, plane, w, h)
@@ -151,10 +154,9 @@ func ditherOrdered(src, dst *image.RGBA, w, h int, p Params) (*image.RGBA, error
 
 	plane := readVec3Plane(src, w, h)
 	for y := 0; y < h; y++ {
-		mr := (y & mask) * n
 		row := y * w
 		for x := 0; x < w; x++ {
-			t := float32((m[mr+(x&mask)] - 0.5) * amp)
+			t := float32((thresh(x, y) - 0.5) * amp)
 			c := &plane[row+x]
 			c[0] = q32(quant, c[0]+t)
 			c[1] = q32(quant, c[1]+t)
@@ -163,6 +165,66 @@ func ditherOrdered(src, dst *image.RGBA, w, h int, p Params) (*image.RGBA, error
 	}
 	writeVec3Plane(dst, src, plane, w, h)
 	return dst, nil
+}
+
+// orderedThreshold returns a position -> [0,1) threshold function for the
+// named ordered-dither pattern. `matrix` sizes the tiled matrices ("2".."16",
+// Bayer only); `seed` feeds the white-noise pattern.
+func orderedThreshold(pattern, matrix string, seed int) func(x, y int) float64 {
+	switch pattern {
+	case "white-noise":
+		return func(x, y int) float64 { return hashNoise(x, y, seed) }
+	case "blue-noise":
+		return blueNoiseAt
+	case "cluster":
+		m, n := clusteredDot8(), 8
+		return func(x, y int) float64 { return m[(y%n)*n+x%n] }
+	case "radial":
+		const n = 8
+		return func(x, y int) float64 {
+			dx := float64(x%n) - (n-1)/2.0
+			dy := float64(y%n) - (n-1)/2.0
+			d := math.Hypot(dx, dy) / math.Hypot((n-1)/2.0, (n-1)/2.0)
+			if d > 1 {
+				d = 1
+			}
+			return 0.03125 + d*0.9375
+		}
+	case "lines-h":
+		const n = 4
+		return func(_, y int) float64 { return (float64(y%n) + 0.5) / n }
+	case "lines-v":
+		const n = 4
+		return func(x, _ int) float64 { return (float64(x%n) + 0.5) / n }
+	case "lines-d":
+		const n = 4
+		return func(x, y int) float64 { return (float64((x+y)%n) + 0.5) / n }
+	default: // "bayer"
+		n := bayerSize(matrix)
+		m := bayerMatrix(n)
+		mask := n - 1 // n is a power of two
+		return func(x, y int) float64 { return m[(y&mask)*n+(x&mask)] }
+	}
+}
+
+// clusteredDot8 is the classic 8x8 clustered-dot (AM "halftone") ordered
+// matrix, normalised to [0,1) with each cell centred in its bucket.
+func clusteredDot8() []float64 {
+	order := [64]int{
+		24, 10, 12, 26, 35, 47, 49, 37,
+		8, 0, 2, 14, 45, 59, 61, 51,
+		22, 6, 4, 16, 43, 57, 63, 53,
+		30, 20, 18, 28, 33, 41, 55, 39,
+		34, 46, 48, 36, 25, 11, 13, 27,
+		44, 58, 60, 50, 9, 1, 3, 15,
+		42, 56, 62, 52, 23, 7, 5, 17,
+		32, 40, 54, 38, 31, 21, 19, 29,
+	}
+	out := make([]float64, 64)
+	for i, v := range order {
+		out[i] = (float64(v) + 0.5) / 64
+	}
+	return out
 }
 
 // q32 applies a float64 quantiser to a float32 sample.
@@ -177,6 +239,8 @@ func bayerSize(s string) int {
 		return 2
 	case "8":
 		return 8
+	case "16":
+		return 16
 	default:
 		return 4
 	}
@@ -275,6 +339,11 @@ func diffKernelFor(name string) []diffCoef {
 			{1, 0, 5.0 / 32}, {2, 0, 3.0 / 32},
 			{-2, 1, 2.0 / 32}, {-1, 1, 4.0 / 32}, {0, 1, 5.0 / 32}, {1, 1, 4.0 / 32}, {2, 1, 2.0 / 32},
 			{-1, 2, 2.0 / 32}, {0, 2, 3.0 / 32}, {1, 2, 2.0 / 32},
+		}
+	case "sierra-lite":
+		return []diffCoef{
+			{1, 0, 2.0 / 4},
+			{-1, 1, 1.0 / 4}, {0, 1, 1.0 / 4},
 		}
 	default: // floyd-steinberg
 		return []diffCoef{

@@ -48,6 +48,19 @@ func blockAverage(src *image.RGBA, x0, y0, w, h int) color.RGBA {
 	}
 }
 
+// smoothstep is the Hermite S-curve: 0 for e<=lo, 1 for e>=hi, a smooth
+// ramp in between.
+func smoothstep(lo, hi, e float64) float64 {
+	if hi == lo {
+		if e < lo {
+			return 0
+		}
+		return 1
+	}
+	t := clampF((e-lo)/(hi-lo), 0, 1)
+	return t * t * (3 - 2*t)
+}
+
 // clampF saturates v into [lo,hi].
 func clampF(v, lo, hi float64) float64 {
 	switch {
@@ -105,6 +118,138 @@ func lumaPlane(src *image.RGBA) (plane []float64, w, h int) {
 		}
 	}
 	return plane, w, h
+}
+
+// bilinearSample reads src at the fractional position (fx, fy) with
+// bilinear interpolation, clamping the four taps to the image edge so an
+// out-of-range coordinate returns the nearest border pixel. Coordinates
+// are in the normalised (0,0)-origin space, i.e. pixel centres sit at
+// integer+0.5 is NOT assumed — (fx,fy)=(0,0) is the top-left pixel.
+func bilinearSample(src *image.RGBA, fx, fy float64) color.RGBA {
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if w == 0 || h == 0 {
+		return color.RGBA{}
+	}
+	if fx < 0 {
+		fx = 0
+	} else if fx > float64(w-1) {
+		fx = float64(w - 1)
+	}
+	if fy < 0 {
+		fy = 0
+	} else if fy > float64(h-1) {
+		fy = float64(h - 1)
+	}
+	x0 := int(fx)
+	y0 := int(fy)
+	x1, y1 := x0+1, y0+1
+	if x1 > w-1 {
+		x1 = w - 1
+	}
+	if y1 > h-1 {
+		y1 = h - 1
+	}
+	tx := fx - float64(x0)
+	ty := fy - float64(y0)
+
+	at := func(x, y int) (r, g, bl, a float64) {
+		i := src.PixOffset(b.Min.X+x, b.Min.Y+y)
+		return float64(src.Pix[i]), float64(src.Pix[i+1]), float64(src.Pix[i+2]), float64(src.Pix[i+3])
+	}
+	r00, g00, b00, a00 := at(x0, y0)
+	r10, g10, b10, a10 := at(x1, y0)
+	r01, g01, b01, a01 := at(x0, y1)
+	r11, g11, b11, a11 := at(x1, y1)
+
+	lerp := func(p, q, t float64) float64 { return p + (q-p)*t }
+	top := func(p, q float64) float64 { return lerp(p, q, tx) }
+	mix := func(a, b, c, d float64) float64 { return lerp(top(a, b), top(c, d), ty) }
+
+	return color.RGBA{
+		R: clampU8(mix(r00, r10, r01, r11)),
+		G: clampU8(mix(g00, g10, g01, g11)),
+		B: clampU8(mix(b00, b10, b01, b11)),
+		A: clampU8(mix(a00, a10, a01, a11)),
+	}
+}
+
+// boxBlur returns a new RGBA that is src blurred by a separable box filter
+// of the given radius (window edge 2*radius+1). RGB channels are averaged;
+// alpha is carried through from src unchanged, matching the package's
+// "the effect never changes opacity" convention. radius <= 0 clones src.
+func boxBlur(src *image.RGBA, radius int) *image.RGBA {
+	b := src.Bounds()
+	w, h := b.Dx(), b.Dy()
+	if radius <= 0 || w == 0 || h == 0 {
+		return cloneRGBA(src)
+	}
+
+	// Horizontal pass: src -> tmp.
+	tmp := image.NewRGBA(image.Rect(0, 0, w, h))
+	win := float64(2*radius + 1)
+	for y := 0; y < h; y++ {
+		si := src.PixOffset(b.Min.X, b.Min.Y+y)
+		ti := tmp.PixOffset(0, y)
+		get := func(x int) (int, int, int) {
+			if x < 0 {
+				x = 0
+			} else if x > w-1 {
+				x = w - 1
+			}
+			o := si + x*4
+			return int(src.Pix[o]), int(src.Pix[o+1]), int(src.Pix[o+2])
+		}
+		var sr, sg, sb int
+		for k := -radius; k <= radius; k++ {
+			r, g, bl := get(k)
+			sr, sg, sb = sr+r, sg+g, sb+bl
+		}
+		for x := 0; x < w; x++ {
+			o := ti + x*4
+			tmp.Pix[o] = uint8(float64(sr)/win + 0.5)
+			tmp.Pix[o+1] = uint8(float64(sg)/win + 0.5)
+			tmp.Pix[o+2] = uint8(float64(sb)/win + 0.5)
+			tmp.Pix[o+3] = 255
+			ar, ag, ab := get(x + radius + 1)
+			rr, rg, rb := get(x - radius)
+			sr += ar - rr
+			sg += ag - rg
+			sb += ab - rb
+		}
+	}
+
+	// Vertical pass: tmp -> dst, then restore src alpha.
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	for x := 0; x < w; x++ {
+		get := func(y int) (int, int, int) {
+			if y < 0 {
+				y = 0
+			} else if y > h-1 {
+				y = h - 1
+			}
+			o := tmp.PixOffset(x, y)
+			return int(tmp.Pix[o]), int(tmp.Pix[o+1]), int(tmp.Pix[o+2])
+		}
+		var sr, sg, sb int
+		for k := -radius; k <= radius; k++ {
+			r, g, bl := get(k)
+			sr, sg, sb = sr+r, sg+g, sb+bl
+		}
+		for y := 0; y < h; y++ {
+			o := dst.PixOffset(x, y)
+			dst.Pix[o] = uint8(float64(sr)/win + 0.5)
+			dst.Pix[o+1] = uint8(float64(sg)/win + 0.5)
+			dst.Pix[o+2] = uint8(float64(sb)/win + 0.5)
+			dst.Pix[o+3] = src.Pix[src.PixOffset(b.Min.X+x, b.Min.Y+y)+3]
+			ar, ag, ab := get(y + radius + 1)
+			rr, rg, rb := get(y - radius)
+			sr += ar - rr
+			sg += ag - rg
+			sb += ab - rb
+		}
+	}
+	return dst
 }
 
 // convolve3x3 applies kernel k (row-major, k[4] is the centre tap) to a
