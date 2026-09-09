@@ -34,6 +34,36 @@
     <svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="4" /><rect x="8" y="14" width="13" height="4" /></svg>
   {:else if name === "ascii"}
     <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5" /><path d="M9 16l3-8 3 8M10.2 13h3.6" /></svg>
+  {:else if name === "blocks"}
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1" /><g fill="currentColor" stroke="none"><rect x="4" y="4" width="8" height="8" /><rect x="12" y="12" width="8" height="8" /></g></svg>
+  {:else if name === "glyphscreen"}
+    <svg viewBox="0 0 24 24"><path d="M6 3v6M3 6h6M15 3v6M12 6h6M6 15v6M3 18h6M15 15v6M12 18h6" /></svg>
+  {:else if name === "mosaic"}
+    <svg viewBox="0 0 24 24"><g><rect x="3.5" y="3.5" width="5" height="5" rx="0.5" /><rect x="9.5" y="3.5" width="5" height="5" rx="0.5" /><rect x="15.5" y="3.5" width="5" height="5" rx="0.5" /><rect x="3.5" y="9.5" width="5" height="5" rx="0.5" /><rect x="9.5" y="9.5" width="5" height="5" rx="0.5" /><rect x="15.5" y="9.5" width="5" height="5" rx="0.5" /><rect x="3.5" y="15.5" width="5" height="5" rx="0.5" /><rect x="9.5" y="15.5" width="5" height="5" rx="0.5" /><rect x="15.5" y="15.5" width="5" height="5" rx="0.5" /></g></svg>
+  {:else if name === "pixelart"}
+    <svg viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><rect x="4" y="4" width="4" height="4" /><rect x="8" y="4" width="4" height="4" /><rect x="8" y="8" width="4" height="4" /><rect x="16" y="8" width="4" height="4" /><rect x="12" y="12" width="4" height="4" /></g><rect x="4" y="8" width="4" height="4" /><rect x="12" y="8" width="4" height="4" /><rect x="8" y="12" width="4" height="4" /></svg>
+  {:else if name === "lego"}
+    <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="9" rx="1" /><circle cx="9" cy="7.4" r="2.3" /><circle cx="15" cy="7.4" r="2.3" /></svg>
+  {:else if name === "voxel"}
+    <svg viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z" /><path d="M12 12v9M12 12l8-4.5M12 12l-8-4.5" /></svg>
+  {:else if name === "vignette"}
+    <svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" /><circle cx="12" cy="12" r="5" fill="currentColor" stroke="none" /></svg>
+  {:else if name === "scanlines"}
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5" /><path d="M4 8.5h16M4 12h16M4 15.5h16" /></svg>
+  {:else if name === "crt"}
+    <svg viewBox="0 0 24 24"><path d="M4 6.5a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 20 6.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z" /><path d="M4.5 10.5h15M4.5 14.5h15" /></svg>
+  {:else if name === "chromatic"}
+    <svg viewBox="0 0 24 24"><circle cx="9" cy="12" r="5" /><circle cx="12" cy="12" r="5" /><circle cx="15" cy="12" r="5" /></svg>
+  {:else if name === "blur"}
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="6.2" opacity="0.55" /><circle cx="12" cy="12" r="9.2" opacity="0.3" /></svg>
+  {:else if name === "bloom"}
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" /><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6.2 6.2l2.1 2.1M15.7 15.7l2.1 2.1M17.8 6.2l-2.1 2.1M8.3 15.7l-2.1 2.1" /></svg>
+  {:else if name === "grain"}
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1.5" /><g fill="currentColor" stroke="none"><circle cx="7" cy="7.5" r="0.6" /><circle cx="11" cy="6.5" r="0.6" /><circle cx="15" cy="8.5" r="0.6" /><circle cx="18" cy="6.5" r="0.6" /><circle cx="6.5" cy="11.5" r="0.6" /><circle cx="10" cy="12.5" r="0.6" /><circle cx="13.5" cy="11" r="0.6" /><circle cx="17" cy="13" r="0.6" /><circle cx="8" cy="16.5" r="0.6" /><circle cx="12.5" cy="17.5" r="0.6" /><circle cx="16.5" cy="16.5" r="0.6" /></g></svg>
+  {:else if name === "dust"}
+    <svg viewBox="0 0 24 24"><path d="M6 3.5l3 17M17 3l2.2 18" stroke-width="1.3" /><g fill="currentColor" stroke="none"><circle cx="10.5" cy="8" r="0.75" /><circle cx="14" cy="14.5" r="0.75" /><circle cx="8" cy="17" r="0.75" /></g></svg>
+  {:else if name === "coloroverlay"}
+    <svg viewBox="0 0 24 24"><rect x="4" y="4" width="12" height="12" rx="1.5" /><rect x="9" y="9" width="11" height="11" rx="1.5" fill="currentColor" stroke="none" opacity="0.65" /></svg>
   {:else if name === "gradient"}
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor" stroke="none" /></svg>
   {:else if name === "palette"}
