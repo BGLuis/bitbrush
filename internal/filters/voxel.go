@@ -52,6 +52,20 @@ func Voxel(src *image.RGBA, p Params) (*image.RGBA, error) {
 	s := float64(cell)
 	ax, ay, az := s/2, s/4, s/2
 
+	// Grid indices, not pixel offsets: a cube's screen position is a single
+	// continuous function of (col+X, row+Y) across the whole grid, not just
+	// its own cell. Two neighbouring cubes then always share the exact same
+	// projected edge (proven by construction — the shared corner is the same
+	// (col,row) pair evaluated from either side), so the isometric field
+	// tiles with no background bleeding through at the seams. Positioning
+	// each cube from its own cell centre independently (as before) breaks
+	// that: adjacent hexagonal cube silhouettes only touch at single points,
+	// leaving a diamond lattice of background gaps between every cube.
+	nCols := (w + cell - 1) / cell
+	nRows := (h + cell - 1) / cell
+	ox0 := float64(w) / 2
+	oy0 := float64(h)/2 - float64(nCols+nRows)*ay/2
+
 	shadeCol := func(c color.RGBA, k float64) color.RGBA {
 		return color.RGBA{R: clampU8(float64(c.R) * k), G: clampU8(float64(c.G) * k), B: clampU8(float64(c.B) * k), A: 255}
 	}
@@ -68,13 +82,14 @@ func Voxel(src *image.RGBA, p Params) (*image.RGBA, error) {
 				zTop = 1 + luma(base.R, base.G, base.B)/255*1.5
 			}
 
-			ox := float64(cx) + s/2
-			oy := float64(cy) + s/2
-			// proj maps cube coords (X,Y in [0,1], Z in [0,zTop]) to screen.
+			col, row := float64(cx/cell), float64(cy/cell)
+			// proj maps cube coords (X,Y in [0,1], Z in [0,zTop]) to screen,
+			// via the grid-wide column/row this cube sits at.
 			proj := func(X, Y, Z float64) [2]float64 {
+				totalX, totalY := col+X, row+Y
 				return [2]float64{
-					ox + (X-Y)*ax,
-					oy + (X+Y)*ay - Z*az,
+					ox0 + (totalX-totalY)*ax,
+					oy0 + (totalX+totalY)*ay - Z*az,
 				}
 			}
 
