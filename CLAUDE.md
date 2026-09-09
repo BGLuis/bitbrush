@@ -294,11 +294,26 @@ not).
 
 ## Toolchain decisions
 
-- Build with **standard Go**. TinyGo (much smaller binary) is the planned size optimisation but
-  is *not* in use — don't code the core around TinyGo's stdlib limits. Revisit when binary size
-  is a real problem.
-- 100% static hosting (Netlify / GitHub Pages / Cloudflare Pages). No backend, no database.
-  Don't add server-side code without revisiting this decision.
+- **Two build paths for the WASM core.** `make wasm` / `make dev` / `make build` (local dev, and
+  what `make check`/`go test` validate against) compile with **standard Go** — this is the
+  reference path. **Production (Vercel)** builds via `scripts/vercel-build.sh`, which tries
+  **TinyGo 0.42.0** first (~3.1MB vs ~5.5MB with standard Go) and falls back to a standard-Go
+  build only if the TinyGo build itself fails to compile. A TinyGo build that compiles can still
+  behave subtly differently from the standard-Go binary the tests ran against (stdlib/reflection
+  gaps), so a green `make check`/`make test` doesn't by itself guarantee the Vercel build is
+  correct — when adding something non-trivial to `internal/`, worth a spot check with
+  `tinygo build -o /tmp/main.wasm -target=wasm ./cmd/wasm` too.
+- 100% static hosting — currently deployed to **Vercel** (see `vercel.json`: custom
+  `buildCommand`, `/main.wasm` + `/wasm_exec.js` served with explicit `Content-Type` +
+  `Cache-Control` headers, SPA rewrite for client-side routing). Netlify / GitHub Pages /
+  Cloudflare Pages remain viable alternatives — no backend, no database. Don't add server-side
+  code without revisiting this decision.
+- `main.wasm` / `wasm_exec.js` are served from a **fixed, non-content-hashed URL**. Their
+  `vercel.json` cache header is deliberately short/revalidate-on-fetch (not a long
+  `immutable` `max-age`) *because* the filename never changes across deploys — a long immutable
+  cache would let browsers that visited before a fix keep serving the pre-fix binary for the
+  full cache lifetime. Don't reintroduce `immutable`/a long `max-age` here unless the filenames
+  also gain a content hash.
 - **Svelte 5** for the shell (runes; no SvelteKit — plain Vite SPA that `mount()`s one tree).
   `@sveltejs/vite-plugin-svelte` is pinned to the v5 line to stay on Vite 6. Type-check with
   `svelte-check`, not bare `tsc`. Keep pixel/gradient/palette logic out of components — it
