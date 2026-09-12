@@ -8,7 +8,9 @@ import (
 	"bitbrush/internal/filters"
 	"bitbrush/internal/generators"
 	"bitbrush/internal/gradient"
+	"bitbrush/internal/mask"
 	"bitbrush/internal/noisefield"
+	"bitbrush/internal/text"
 )
 
 // maxDim caps a rendered canvas dimension, matching internal/gradient.
@@ -24,12 +26,14 @@ const (
 	SourceGenerator  SourceKind = "generator"  // internal/generators registry, by Generator name
 	SourceGradient   SourceKind = "gradient"   // internal/gradient, from GenParams
 	SourceNoiseField SourceKind = "noisefield" // internal/noisefield, from GenParams
+	SourceText       SourceKind = "text"       // internal/text, from GenParams
 )
 
 // Stage is one entry in a layer's own ordered filter chain.
 type Stage struct {
 	Filter string         `json:"filter"`
 	Params filters.Params `json:"params"`
+	Mask   *mask.Mask     `json:"mask,omitempty"`
 }
 
 // Layer is one entry in the stack, composited over everything below it.
@@ -92,9 +96,14 @@ func Evaluate(spec Spec, base *image.RGBA, extras []*image.RGBA) (*image.RGBA, e
 
 		cur := src
 		for j, st := range layer.Chain {
-			cur, err = filters.Apply(st.Filter, cur, st.Params)
+			filtered, err := filters.Apply(st.Filter, cur, st.Params)
 			if err != nil {
 				return nil, fmt.Errorf("compositor: layer %d stage %d (%q): %w", i, j, st.Filter, err)
+			}
+			if st.Mask != nil {
+				cur = mask.Compose(cur, filtered, st.Mask)
+			} else {
+				cur = filtered
 			}
 		}
 
@@ -137,6 +146,13 @@ func resolveSource(layer Layer, base *image.RGBA, extras []*image.RGBA, w, h int
 
 	case SourceNoiseField:
 		return noisefield.RenderJSON(nonNilJSON(layer.GenParams), w, h)
+
+	case SourceText:
+		var p text.Params
+		if err := json.Unmarshal(nonNilJSON(layer.GenParams), &p); err != nil {
+			return nil, fmt.Errorf("source text: bad params: %w", err)
+		}
+		return text.Render(p, w, h)
 	}
 	return nil, fmt.Errorf("unknown source %q", layer.Source)
 }

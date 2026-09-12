@@ -17,6 +17,7 @@ import type {
   ComposeSpec,
   PaletteExtractOptions,
   PaletteHarmonyOptions,
+  PipelineStage,
 } from "../wasm";
 
 interface Reply {
@@ -77,6 +78,15 @@ class WorkerBackend implements FilterBackend {
     const copy = img.data.slice(); // don't neuter the caller's ImageData on transfer
     const r = await this.#sendPinned(
       { op: "filter", name, buf: copy.buffer, width: img.width, height: img.height, params: JSON.stringify(params) },
+      [copy.buffer],
+    );
+    return new ImageData(new Uint8ClampedArray(r.buf!), r.width!, r.height!);
+  }
+
+  async applyPipeline(img: ImageData, chain: PipelineStage[]): Promise<ImageData> {
+    const copy = img.data.slice();
+    const r = await this.#sendPinned(
+      { op: "pipeline", buf: copy.buffer, width: img.width, height: img.height, chain: JSON.stringify(chain) },
       [copy.buffer],
     );
     return new ImageData(new Uint8ClampedArray(r.buf!), r.width!, r.height!);

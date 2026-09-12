@@ -196,3 +196,93 @@ func TestEvaluateErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluateTextLayer(t *testing.T) {
+	textJSON, err := json.Marshal(map[string]any{
+		"content":    "Hi",
+		"fontFamily": "go",
+		"size":       20.0,
+		"color":      "#ffffff",
+		"x":          0.5,
+		"y":          0.5,
+		"align":      "center",
+		"opacity":    1.0,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	spec := Spec{
+		Width:  64,
+		Height: 64,
+		Layers: []Layer{
+			{
+				Enabled:   true,
+				Source:    SourceText,
+				GenParams: textJSON,
+				Blend:     BlendNormal,
+				Opacity:   1.0,
+			},
+		},
+	}
+
+	out, err := Evaluate(spec, nil, nil)
+	if err != nil {
+		t.Fatalf("Evaluate with SourceText failed: %v", err)
+	}
+
+	hasPixel := false
+	for i := 3; i < len(out.Pix); i += 4 {
+		if out.Pix[i] > 0 {
+			hasPixel = true
+			break
+		}
+	}
+	if !hasPixel {
+		t.Errorf("expected text layer to render visible pixels")
+	}
+}
+
+func TestEvaluateStageWithMask(t *testing.T) {
+	base := solid(64, 64, 100, 100, 100, 255)
+	// Apply invert filter, but masked to only a sub-rect
+	maskJSON := []byte(`{"kind":"rect","x":0.25,"y":0.25,"w":0.5,"h":0.5,"feather":0}`)
+
+	stage := Stage{
+		Filter: "grayscale",
+		Params: filters.Params{"brightness": 100.0},
+	}
+	if err := json.Unmarshal(maskJSON, &stage.Mask); err != nil {
+		t.Fatal(err)
+	}
+
+	spec := Spec{
+		Layers: []Layer{
+			{
+				Enabled: true,
+				Source:  SourceBase,
+				Blend:   BlendNormal,
+				Opacity: 1.0,
+				Chain:   []Stage{stage},
+			},
+		},
+	}
+
+	out, err := Evaluate(spec, base, nil)
+	if err != nil {
+		t.Fatalf("Evaluate with Stage.Mask failed: %v", err)
+	}
+
+	// Inside rect (32, 32) brightness is boosted
+	idxInside := out.PixOffset(32, 32)
+	// Outside rect (5, 5) remains original 100
+	idxOutside := out.PixOffset(5, 5)
+
+	if out.Pix[idxInside] <= 100 {
+		t.Errorf("inside mask R=%d, want boosted > 100", out.Pix[idxInside])
+	}
+	if out.Pix[idxOutside] != 100 {
+		t.Errorf("outside mask R=%d, want original 100", out.Pix[idxOutside])
+	}
+}
+

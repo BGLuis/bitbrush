@@ -6,6 +6,7 @@
 import {
   initWasm,
   applyFilter as wasmApplyFilter,
+  applyPipeline as wasmApplyPipeline,
   asciiText as wasmAsciiText,
   renderGIF as wasmRenderGIF,
   renderGradient as wasmRenderGradient,
@@ -26,6 +27,7 @@ import {
   type ComposeSpec,
   type PaletteExtractOptions,
   type PaletteHarmonyOptions,
+  type PipelineStage,
 } from "../wasm";
 import { registerBackend, type FilterBackend } from "../backend";
 
@@ -38,6 +40,10 @@ class CpuBackend implements FilterBackend {
 
   async applyFilter(name: string, img: ImageData, params: FilterParams): Promise<ImageData> {
     return wasmApplyFilter(name, img, params);
+  }
+
+  async applyPipeline(img: ImageData, chain: PipelineStage[]): Promise<ImageData> {
+    return wasmApplyPipeline(img, chain);
   }
 
   async asciiText(img: ImageData, params: FilterParams): Promise<string> {

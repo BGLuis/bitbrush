@@ -572,4 +572,23 @@ export const effects: EffectUI[] = [
       { key: "opacity", label: "Opacidade", type: "range", min: 0, max: 1, step: 0.05, default: 0.3 },
     ],
   },
+  {
+    name: "chroma-key",
+    title: "Chroma Key (remover cor)",
+    controls: [
+      { key: "color", label: "Cor alvo (hex)", type: "text", default: "#00ff00" },
+      { key: "tolerance", label: "Tolerância", type: "range", min: 0, max: 1, step: 0.01, default: 0.3 },
+      { key: "feather", label: "Suavização de borda", type: "range", min: 0, max: 0.5, step: 0.01, default: 0.05 },
+      { key: "invert", label: "Inverter (manter a cor)", type: "checkbox", default: false },
+    ],
+  },
+  {
+    name: "luma-key",
+    title: "Luma Key (remover por luminosidade)",
+    controls: [
+      { key: "threshold", label: "Limiar de luminância", type: "range", min: 0, max: 1, step: 0.01, default: 0.1 },
+      { key: "feather", label: "Suavização de borda", type: "range", min: 0, max: 0.5, step: 0.01, default: 0.05 },
+      { key: "invert", label: "Inverter (remover brilho)", type: "checkbox", default: false },
+    ],
+  },
 ];

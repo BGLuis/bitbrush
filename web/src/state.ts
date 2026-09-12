@@ -30,13 +30,13 @@ export interface GeneratorURLState {
 }
 
 export interface ComposeLayerRecipe {
-  source: string; // "base" | "img" | "gen:NAME" | "grad" | "noise"
+  source: string; // "base" | "img" | "gen:NAME" | "grad" | "noise" | "text"
   enabled?: boolean;
   blend?: string;
   opacity?: number;
   fit?: string;
   genParams?: Record<string, any>;
-  chain?: Array<{ filter: string; params: Record<string, any> }>;
+  chain?: Array<{ filter: string; params: Record<string, any>; mask?: any }>;
 }
 
 export interface ComposeURLState {
@@ -70,7 +70,11 @@ export function readStateFromURL(): URLState {
           fit: typeof e.f === "string" ? e.f : undefined,
           genParams: e.p && typeof e.p === "object" ? e.p : undefined,
           chain: Array.isArray(e.c)
-            ? e.c.map((c: any) => ({ filter: String(c[0]), params: c[1] ?? {} }))
+            ? e.c.map((c: any) => ({
+                filter: String(c[0]),
+                params: c[1] ?? {},
+                mask: c[2] ?? undefined,
+              }))
             : [],
         }));
       } catch {
@@ -295,7 +299,9 @@ export function writeComposeStateToURL(state: ComposeURLState, immediate = false
     if (L.enabled === false) e.e = 0;
     if (L.fit && L.fit !== "cover") e.f = L.fit;
     if (L.genParams && Object.keys(L.genParams).length) e.p = L.genParams;
-    if (L.chain && L.chain.length) e.c = L.chain.map((c) => [c.filter, c.params]);
+    if (L.chain && L.chain.length) {
+      e.c = L.chain.map((c) => (c.mask ? [c.filter, c.params, c.mask] : [c.filter, c.params]));
+    }
     return e;
   });
   q.set("cs", JSON.stringify(cs));

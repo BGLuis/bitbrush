@@ -26,6 +26,7 @@ func main() {
 	uint8Array = js.Global().Get("Uint8Array")
 
 	js.Global().Set("bitbrushApplyFilter", js.FuncOf(applyFilter))
+	js.Global().Set("bitbrushApplyPipeline", js.FuncOf(applyPipeline))
 	js.Global().Set("bitbrushAsciiText", js.FuncOf(asciiText))
 	js.Global().Set("bitbrushRenderGIF", js.FuncOf(renderGIF))
 	registerGenerators()

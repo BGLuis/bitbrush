@@ -13,7 +13,7 @@
 
   let { layer, index }: { layer: LayerUI; index: number } = $props();
 
-  const SOURCES: LayerSource[] = ["base", "image", "generator", "gradient", "noisefield"];
+  const SOURCES: LayerSource[] = ["base", "image", "generator", "gradient", "noisefield", "text"];
 
   const NOISE_FIELDS = [
     "linear",
@@ -301,6 +301,101 @@
         />
       </label>
     </div>
+  {:else if layer.source === "text"}
+    <div class="mini">
+      <label class="fld" style="grid-column: 1 / -1">
+        <span>Texto</span>
+        <textarea
+          rows="3"
+          class="txt-area"
+          value={layer.genParams.content ?? "BitBrush"}
+          oninput={(e) => {
+            layer.genParams.content = (e.currentTarget as HTMLTextAreaElement).value;
+            touch();
+          }}
+        ></textarea>
+      </label>
+      <label class="fld">
+        <span>Fonte</span>
+        <select
+          value={layer.genParams.fontFamily ?? "go"}
+          onchange={(e) => {
+            layer.genParams.fontFamily = e.currentTarget.value;
+            touch();
+          }}
+        >
+          <option value="go">Go Sans</option>
+          <option value="gomono">Go Mono</option>
+        </select>
+      </label>
+      <label class="fld">
+        <span>Tamanho (pt) · {layer.genParams.size ?? 72}</span>
+        <input
+          type="range"
+          min="12"
+          max="240"
+          step="2"
+          value={layer.genParams.size ?? 72}
+          oninput={(e) => {
+            layer.genParams.size = Number(e.currentTarget.value);
+            touch();
+          }}
+        />
+      </label>
+      <label class="fld">
+        <span>Cor</span>
+        <input
+          type="color"
+          value={layer.genParams.color ?? "#ffffff"}
+          oninput={(e) => {
+            layer.genParams.color = e.currentTarget.value;
+            touch();
+          }}
+        />
+      </label>
+      <label class="fld">
+        <span>Alinhamento</span>
+        <select
+          value={layer.genParams.align ?? "center"}
+          onchange={(e) => {
+            layer.genParams.align = e.currentTarget.value;
+            touch();
+          }}
+        >
+          <option value="left">Esquerda</option>
+          <option value="center">Centro</option>
+          <option value="right">Direita</option>
+        </select>
+      </label>
+      <label class="fld" style="grid-column: 1 / -1">
+        <span>Posição X · {Math.round((layer.genParams.x ?? 0.5) * 100)}%</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={layer.genParams.x ?? 0.5}
+          oninput={(e) => {
+            layer.genParams.x = Number(e.currentTarget.value);
+            touch();
+          }}
+        />
+      </label>
+      <label class="fld" style="grid-column: 1 / -1">
+        <span>Posição Y · {Math.round((layer.genParams.y ?? 0.5) * 100)}%</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value={layer.genParams.y ?? 0.5}
+          oninput={(e) => {
+            layer.genParams.y = Number(e.currentTarget.value);
+            touch();
+          }}
+        />
+      </label>
+    </div>
   {/if}
 
   <ChainEditor {layer} {index} />
@@ -375,5 +470,16 @@
     margin: 0;
     font-size: 11px;
     color: var(--mute);
+  }
+  .txt-area {
+    width: 100%;
+    background: var(--s2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: 6px 8px;
+    font-size: 12px;
+    resize: vertical;
+    font-family: inherit;
   }
 </style>

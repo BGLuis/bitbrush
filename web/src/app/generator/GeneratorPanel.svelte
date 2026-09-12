@@ -14,6 +14,8 @@
   import PresetsGrid from "./PresetsGrid.svelte";
 
   let showPresets = $state(true);
+  let gifFrames = $state(24);
+  let gifFps = $state(12);
 
   onMount(() => {
     generatorStore.scheduleRender();
@@ -324,6 +326,43 @@
             <span>Animar fluxo no preview vivo</span>
             <kbd style="font-size: 10px; margin-left: 6px; opacity: 0.6; font-family: var(--mono, monospace);">Espaço</kbd>
           </label>
+        </div>
+
+        <div class="gif-export-row">
+          <div class="gif-params">
+            <label class="gif-label">
+              Frames
+              <input
+                type="number"
+                class="gif-num"
+                min="4"
+                max="120"
+                bind:value={gifFrames}
+              />
+            </label>
+            <label class="gif-label">
+              FPS
+              <input
+                type="number"
+                class="gif-num"
+                min="1"
+                max="30"
+                bind:value={gifFps}
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            class="export-btn gif-btn"
+            disabled={generatorStore.gifExporting}
+            onclick={() => generatorStore.exportNoiseFieldGIF(gifFrames, gifFps)}
+          >
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2z"/>
+              <path d="M12 8v4l3 3"/>
+            </svg>
+            {generatorStore.gifExporting ? 'Gerando GIF…' : 'Exportar GIF animado'}
+          </button>
         </div>
       {/if}
 
@@ -853,5 +892,49 @@
     background: var(--s2);
     border: 1px solid var(--line);
     border-radius: var(--radius-sm);
+  }
+  .gif-export-row {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .gif-params {
+    display: flex;
+    gap: 10px;
+  }
+  .gif-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    color: var(--dim);
+  }
+  .gif-num {
+    width: 52px;
+    padding: 3px 5px;
+    font-size: 12px;
+    font-family: var(--mono);
+    background: var(--s2);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+  }
+  .gif-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    background: color-mix(in srgb, var(--accent) 12%, var(--s2));
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+    color: var(--accent);
+  }
+  .gif-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 22%, var(--s2));
+  }
+  .gif-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
   }
 </style>

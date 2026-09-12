@@ -20,6 +20,7 @@ import type {
   PaletteExtractOptions,
   PaletteHarmonyOptions,
   ComposeSpec,
+  PipelineStage,
 } from "./wasm";
 
 export type BackendKind = "cpu" | "cpu-worker" | "gpu";
@@ -31,6 +32,8 @@ export interface FilterBackend {
   init(): Promise<void>;
   /** Whole-image filter. Returns fresh ImageData; never mutates the input. */
   applyFilter(name: string, img: ImageData, params: FilterParams): Promise<ImageData>;
+  /** Apply an ordered chain of filter stages in one WASM call. */
+  applyPipeline(img: ImageData, chain: PipelineStage[]): Promise<ImageData>;
   /** ASCII filter's text export. */
   asciiText(img: ImageData, params: FilterParams): Promise<string>;
   /**

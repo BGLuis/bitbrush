@@ -110,6 +110,16 @@ self.onmessage = async (e) => {
       return;
     }
 
+    if (req.op === "pipeline") {
+      const r = bitbrushApplyPipeline(bytes, req.width, req.height, req.chain);
+      if (!r.ok || !r.data) throw new Error(r.error || "pipeline failed");
+      self.postMessage(
+        { id: req.id, ok: true, buf: r.data.buffer, width: req.width, height: req.height },
+        [r.data.buffer],
+      );
+      return;
+    }
+
     const r = bitbrushApplyFilter(req.name, bytes, req.width, req.height, req.params);
     if (!r.ok || !r.data) throw new Error(r.error || "filter failed");
     self.postMessage(

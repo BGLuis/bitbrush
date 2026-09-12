@@ -12,6 +12,7 @@
 import {
   initWasm,
   applyFilter as wasmApplyFilter,
+  applyPipeline as wasmApplyPipeline,
   asciiText as wasmAsciiText,
   renderGIF as wasmRenderGIF,
   renderGradient as wasmRenderGradient,
@@ -35,6 +36,7 @@ import type {
   ComposeSpec,
   PaletteExtractOptions,
   PaletteHarmonyOptions,
+  PipelineStage,
 } from "../wasm";
 
 const ACCELERATED = new Set(["pixelate"]);
@@ -236,6 +238,10 @@ class GpuBackend implements FilterBackend {
   async applyFilter(name: string, img: ImageData, params: FilterParams): Promise<ImageData> {
     if (name === "pixelate") return this.#pixelateGPU(img, params);
     return wasmApplyFilter(name, img, params); // delegated to the CPU core
+  }
+
+  async applyPipeline(img: ImageData, chain: PipelineStage[]): Promise<ImageData> {
+    return wasmApplyPipeline(img, chain); // sequential per-pixel work: CPU core
   }
 
   async asciiText(img: ImageData, params: FilterParams): Promise<string> {

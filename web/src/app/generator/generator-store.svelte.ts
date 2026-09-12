@@ -72,6 +72,7 @@ class GeneratorStore {
   // Status & copy feedback
   statusMessage = $state("");
   copiedCSS = $state(false);
+  gifExporting = $state(false);
 
   // Internal clock & render state
   #clock = 0;
@@ -657,6 +658,45 @@ class GeneratorStore {
     } catch (err) {
       console.error(err);
       this.setStatus("Erro ao exportar PNG.");
+    }
+  }
+
+  async exportNoiseFieldGIF(frames = 24, fps = 12): Promise<void> {
+    if (!this.isOrganic) {
+      this.setStatus("GIF animado disponível apenas para campos orgânicos (Mesh, Freeform, Flow).");
+      return;
+    }
+    this.gifExporting = true;
+    this.setStatus("Gerando GIF animado…");
+    try {
+      const backend = await getBackend(ui.settings.backend);
+      const { w, h } = this.previewDimensions;
+      // start = params at time 0, end = params at time 1 (one full cycle)
+      const start = this.getNoiseParams(0);
+      const end = this.getNoiseParams(1);
+      const gif = await backend.renderNoiseFieldGIF(start, end, w, h, {
+        frames,
+        fps,
+        loop: true,
+        pingPong: true,
+        maxDimension: 480,
+      });
+      const gifBuf = new Uint8Array(gif).buffer as ArrayBuffer;
+      const blob = new Blob([gifBuf], { type: "image/gif" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bitbrush-${this.field}-${this.style}-${frames}f-${fps}fps.gif`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      this.setStatus(`GIF ${w}×${h} px (${frames} frames, ${fps} fps) exportado!`);
+    } catch (err) {
+      console.error(err);
+      this.setStatus("Erro ao exportar GIF.");
+    } finally {
+      this.gifExporting = false;
     }
   }
 

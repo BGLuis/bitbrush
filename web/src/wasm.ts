@@ -71,6 +71,12 @@ declare global {
     extrasRGBA: Uint8Array,
     extrasDimsJSON: string,
   ): { ok: boolean; data: Uint8Array | null; width: number; height: number; error: string };
+  function bitbrushApplyPipeline(
+    rgba: Uint8Array,
+    w: number,
+    h: number,
+    chainJSON: string,
+  ): { ok: boolean; data: Uint8Array | null; error: string };
 }
 
 export interface GradientStop {
@@ -316,14 +322,37 @@ export type BlendMode =
   | "linear-dodge"
   | "subtract";
 
-export type LayerSource = "base" | "image" | "generator" | "gradient" | "noisefield";
+export type LayerSource = "base" | "image" | "generator" | "gradient" | "noisefield" | "text";
 
 export type FitMode = "cover" | "contain" | "stretch" | "center" | "tile";
+
+export interface MaskParams {
+  kind: "rect" | "ellipse" | "luma";
+  x?: number; // [0, 1]
+  y?: number; // [0, 1]
+  w?: number; // [0, 1]
+  h?: number; // [0, 1]
+  feather?: number; // [0, 1]
+  threshold?: number; // [0, 1] (luma)
+  invert?: boolean;
+}
+
+export interface TextParams {
+  content: string;
+  fontFamily?: "go" | "gomono" | string;
+  size?: number;
+  color?: string;
+  x?: number;
+  y?: number;
+  align?: "left" | "center" | "right" | string;
+  opacity?: number;
+}
 
 /** One entry in a layer's own ordered filter chain. */
 export interface ComposeStage {
   filter: string;
   params: FilterParams;
+  mask?: MaskParams;
 }
 
 export interface ComposeLayer {
@@ -331,7 +360,7 @@ export interface ComposeLayer {
   source: LayerSource;
   imageIndex?: number; // source === "image"
   generator?: string; // source === "generator"
-  genParams?: Record<string, unknown>; // generator / gradient / noisefield params
+  genParams?: Record<string, unknown>; // generator / gradient / noisefield / text params
   fit?: FitMode; // default "cover"
   chain: ComposeStage[];
   blend: BlendMode;
@@ -382,4 +411,26 @@ export function renderComposite(
   const w = res.width || spec.width || base?.width || 0;
   const h = res.height || spec.height || base?.height || 0;
   return new ImageData(new Uint8ClampedArray(res.data), w, h);
+}
+
+// --- pipeline (internal/filters.Pipeline) ---
+
+/** One stage in a filter chain passed to applyPipeline. */
+export interface PipelineStage {
+  filter: string;
+  params: FilterParams;
+  mask?: MaskParams;
+}
+
+/** Apply an ordered chain of filter stages to an image in a single WASM call.
+ *  Each stage's output is the next stage's input. An empty chain clones src. */
+export function applyPipeline(img: ImageData, chain: PipelineStage[]): ImageData {
+  const res = bitbrushApplyPipeline(
+    new Uint8Array(img.data.buffer, img.data.byteOffset, img.data.byteLength),
+    img.width,
+    img.height,
+    JSON.stringify(chain),
+  );
+  if (!res.ok || !res.data) throw new Error(res.error || "pipeline failed");
+  return new ImageData(new Uint8ClampedArray(res.data), img.width, img.height);
 }

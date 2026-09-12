@@ -17,7 +17,7 @@ import { downloadCanvas } from "../lib/download";
 import { showToast } from "../lib/toast.svelte";
 import { generators } from "../../ui/generators";
 import type { Control } from "../../ui/controls";
-import type { BlendMode, ComposeLayer, ComposeSpec, FitMode, LayerSource } from "../../wasm";
+import type { BlendMode, ComposeLayer, ComposeSpec, FitMode, LayerSource, MaskParams } from "../../wasm";
 
 export const BLEND_MODES: BlendMode[] = [
   "normal",
@@ -44,12 +44,14 @@ export const SOURCE_LABELS: Record<LayerSource, string> = {
   generator: "Gerador",
   gradient: "Gradiente",
   noisefield: "Campo de ruído",
+  text: "Texto",
 };
 
 export interface ChainStage {
   id: string;
   filter: string;
   params: Record<string, number | string | boolean>;
+  mask?: MaskParams;
 }
 
 export interface ImageSlot {
@@ -114,6 +116,19 @@ function defaultNoiseParams(): Record<string, any> {
   };
 }
 
+function defaultTextParams(): Record<string, any> {
+  return {
+    content: "BitBrush",
+    fontFamily: "go",
+    size: 72,
+    color: "#ffffff",
+    x: 0.5,
+    y: 0.5,
+    align: "center",
+    opacity: 1.0,
+  };
+}
+
 function newLayer(source: LayerSource): LayerUI {
   const L: LayerUI = {
     id: uid("L"),
@@ -140,6 +155,10 @@ function newLayer(source: LayerSource): LayerUI {
       L.genParams = defaultNoiseParams();
       L.blend = "soft-light";
       L.opacity = 0.5;
+      break;
+    case "text":
+      L.genParams = defaultTextParams();
+      L.blend = "normal";
       break;
     case "image":
     case "base":
@@ -278,6 +297,10 @@ class ComposeStore {
     this.layers[i].chain[j].params[key] = val as number | string | boolean;
     this.scheduleRender();
   }
+  setStageMask(i: number, j: number, mask: MaskParams | undefined): void {
+    this.layers[i].chain[j].mask = mask;
+    this.scheduleRender();
+  }
 
   // --- image slots ---
 
@@ -341,7 +364,7 @@ class ComposeStore {
         fit: L.fit,
         blend: L.blend,
         opacity: L.opacity,
-        chain: L.chain.map((s) => ({ filter: s.filter, params: s.params })),
+        chain: L.chain.map((s) => ({ filter: s.filter, params: s.params, mask: s.mask })),
       };
       if (L.source === "base" && !base) {
         cl.enabled = false; // no base image loaded yet — keep the recipe, draw nothing
@@ -362,7 +385,7 @@ class ComposeStore {
       } else if (L.source === "generator") {
         cl.generator = L.generator;
         cl.genParams = L.genParams;
-      } else if (L.source === "gradient" || L.source === "noisefield") {
+      } else if (L.source === "gradient" || L.source === "noisefield" || L.source === "text") {
         cl.genParams = L.genParams;
       }
       return cl;
@@ -428,7 +451,9 @@ class ComposeStore {
                 ? "grad"
                 : L.source === "noisefield"
                   ? "noise"
-                  : "base";
+                  : L.source === "text"
+                    ? "text"
+                    : "base";
         return {
           source,
           enabled: L.enabled,
@@ -436,10 +461,10 @@ class ComposeStore {
           opacity: L.opacity,
           fit: L.fit,
           genParams:
-            L.source === "generator" || L.source === "gradient" || L.source === "noisefield"
+            L.source === "generator" || L.source === "gradient" || L.source === "noisefield" || L.source === "text"
               ? L.genParams
               : undefined,
-          chain: L.chain.map((s) => ({ filter: s.filter, params: s.params })),
+          chain: L.chain.map((s) => ({ filter: s.filter, params: s.params, mask: s.mask })),
         };
       }),
     };
@@ -458,6 +483,7 @@ class ComposeStore {
       let generator = "truchet";
       if (r.source === "grad") source = "gradient";
       else if (r.source === "noise") source = "noisefield";
+      else if (r.source === "text" || r.source === "txt") source = "text";
       else if (r.source.startsWith("gen:")) {
         source = "generator";
         generator = r.source.slice(4) || "truchet";
@@ -467,6 +493,8 @@ class ComposeStore {
       L.generator = generator;
       if (source === "generator") {
         L.genParams = { ...defaultGeneratorParams(generator), ...(r.genParams ?? {}) };
+      } else if (source === "text") {
+        L.genParams = { ...defaultTextParams(), ...(r.genParams ?? {}) };
       } else if (r.genParams) {
         L.genParams = r.genParams;
       }
@@ -480,6 +508,7 @@ class ComposeStore {
         id: uid("S"),
         filter: s.filter,
         params: s.params as Record<string, number | string | boolean>,
+        mask: s.mask,
       }));
       return L;
     });
