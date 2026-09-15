@@ -9,6 +9,7 @@
   import { generators } from "../../ui/generators";
   import ParamForm from "../ParamForm.svelte";
   import ChainEditor from "./ChainEditor.svelte";
+  import MaskEditor from "./MaskEditor.svelte";
   import type { LayerSource } from "../../wasm";
 
   let { layer, index }: { layer: LayerUI; index: number } = $props();
@@ -150,6 +151,12 @@
         />
       </label>
     </div>
+
+    <MaskEditor
+      mask={layer.mask}
+      onchange={(m) => composeStore.setLayerMask(index, m)}
+      title="Máscara de camada"
+    />
   {/if}
 
   {#if layer.source === "image"}

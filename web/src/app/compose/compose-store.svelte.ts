@@ -78,6 +78,9 @@ export interface LayerUI {
   genParams: Record<string, any>; // generator / gradient / noisefield params
   fit: FitMode;
   transform: ComposeTransform;
+  /** Masks this whole layer against what's below it (distinct from a chain
+   *  stage's own `mask`, which only masks that filter's before/after). */
+  mask?: MaskParams;
   chain: ChainStage[];
   blend: BlendMode;
   opacity: number; // 0..1
@@ -372,6 +375,10 @@ class ComposeStore {
     this.layers[i].transform = identityTransform();
     this.scheduleRender();
   }
+  setLayerMask(i: number, mask: MaskParams | undefined): void {
+    this.layers[i].mask = mask;
+    this.scheduleRender();
+  }
   setRatio(r: string): void {
     this.ratio = r;
     this.scheduleRender();
@@ -488,6 +495,7 @@ class ComposeStore {
         source: L.source,
         fit: L.fit,
         transform: L.transform,
+        mask: L.mask,
         blend: L.blend,
         opacity: L.opacity,
         chain: L.chain.map((s) => ({ filter: s.filter, params: s.params, mask: s.mask })),
@@ -588,6 +596,7 @@ class ComposeStore {
           opacity: L.opacity,
           fit: L.fit,
           transform: [L.transform.offsetX, L.transform.offsetY, L.transform.scale, L.transform.rotation],
+          mask: L.mask,
           genParams:
             L.source === "generator" || L.source === "gradient" || L.source === "noisefield" || L.source === "text"
               ? L.genParams
@@ -636,6 +645,7 @@ class ComposeStore {
         const [offsetX, offsetY, scale, rotation] = r.transform;
         L.transform = { offsetX, offsetY, scale, rotation };
       }
+      if (r.mask) L.mask = r.mask;
       L.chain = (r.chain ?? []).map((s) => ({
         id: uid("S"),
         filter: s.filter,

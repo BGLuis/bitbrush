@@ -373,6 +373,11 @@ export interface ComposeLayer {
   genParams?: Record<string, unknown>; // generator / gradient / noisefield / text params
   fit?: FitMode; // default "cover"
   transform?: ComposeTransform;
+  /** Masks this whole layer against what's below it in the stack (distinct
+   *  from a ComposeStage's own `mask`, which masks one filter stage's
+   *  before/after within this layer's chain). A `kind: "luma"` mask samples
+   *  the luminance of what's BELOW the layer, not the layer's own pixels. */
+  mask?: MaskParams;
   chain: ComposeStage[];
   blend: BlendMode;
   opacity: number; // 0..1

@@ -48,6 +48,12 @@ type Layer struct {
 	Chain      []Stage         `json:"chain,omitempty"`
 	Blend      BlendMode       `json:"blend"`
 	Opacity    float64         `json:"opacity"` // 0..1
+	// Mask restricts this layer's composite over what's below it. Unlike
+	// Stage.Mask (which blends a filter stage's before/after within one
+	// layer), this blends "nothing below the layer" against "the layer
+	// composited over what's below" — so a KindLuma mask samples the
+	// LUMINANCE OF WHAT'S BELOW the layer, not the layer's own pixels.
+	Mask *mask.Mask `json:"mask,omitempty"`
 }
 
 // Spec is a full compose recipe. Width/Height override the base image size;
@@ -111,9 +117,14 @@ func Evaluate(spec Spec, base *image.RGBA, extras []*image.RGBA) (*image.RGBA, e
 			}
 		}
 
-		acc, err = Composite(acc, cur, layer.Blend, layer.Opacity)
+		next, err := Composite(acc, cur, layer.Blend, layer.Opacity)
 		if err != nil {
 			return nil, fmt.Errorf("compositor: layer %d: %w", i, err)
+		}
+		if layer.Mask != nil {
+			acc = mask.Compose(acc, next, layer.Mask)
+		} else {
+			acc = next
 		}
 	}
 	return acc, nil

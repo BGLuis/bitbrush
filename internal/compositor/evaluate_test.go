@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"bitbrush/internal/filters"
+	"bitbrush/internal/mask"
 
 	// Link every generator so SourceGenerator layers resolve, exactly as
 	// cmd/wasm does.
@@ -316,5 +317,127 @@ func TestEvaluateStageWithMask(t *testing.T) {
 	}
 	if out.Pix[idxOutside] != 100 {
 		t.Errorf("outside mask R=%d, want original 100", out.Pix[idxOutside])
+	}
+}
+
+func TestEvaluateLayerMaskRevealsBelowOutsideRegion(t *testing.T) {
+	base := solid(64, 64, 100, 100, 100, 255)
+	overlay := solid(64, 64, 200, 50, 50, 255)
+	spec := Spec{
+		Layers: []Layer{
+			{Enabled: true, Source: SourceBase, Blend: BlendNormal, Opacity: 1},
+			{
+				Enabled: true, Source: SourceImage, ImageIndex: 0, Blend: BlendNormal, Opacity: 1,
+				Mask: &mask.Mask{Kind: mask.KindRect, X: 0.25, Y: 0.25, W: 0.5, H: 0.5},
+			},
+		},
+	}
+	out, err := Evaluate(spec, base, []*image.RGBA{overlay})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Outside the mask: the layer is fully hidden, base shows through unchanged.
+	if r, g, b, a := at(out, 5, 5); r != 100 || g != 100 || b != 100 || a != 255 {
+		t.Fatalf("outside mask = %d,%d,%d,%d, want base 100,100,100,255 untouched", r, g, b, a)
+	}
+	// Inside the mask: the layer composites normally, as if unmasked.
+	if r, g, b, a := at(out, 32, 32); r != 200 || g != 50 || b != 50 || a != 255 {
+		t.Fatalf("inside mask = %d,%d,%d,%d, want overlay 200,50,50,255", r, g, b, a)
+	}
+}
+
+func TestEvaluateLayerMaskFeatherBlendsAtEdge(t *testing.T) {
+	base := solid(64, 64, 100, 100, 100, 255)
+	overlay := solid(64, 64, 200, 50, 50, 255)
+	spec := Spec{
+		Layers: []Layer{
+			{Enabled: true, Source: SourceBase, Blend: BlendNormal, Opacity: 1},
+			{
+				Enabled: true, Source: SourceImage, ImageIndex: 0, Blend: BlendNormal, Opacity: 1,
+				Mask: &mask.Mask{Kind: mask.KindRect, X: 0.25, Y: 0.25, W: 0.5, H: 0.5, Feather: 0.2},
+			},
+		},
+	}
+	out, err := Evaluate(spec, base, []*image.RGBA{overlay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// (17, 32) sits inside the feather band (1px past the 16px rect edge,
+	// with a ~6.4px feather) — strictly between base and overlay, not equal
+	// to either, proving the edge actually blends rather than hard-cutting.
+	r, _, _, _ := at(out, 17, 32)
+	if r <= 100 || r >= 200 {
+		t.Fatalf("feathered edge R=%d, want strictly between base 100 and overlay 200", r)
+	}
+}
+
+func TestEvaluateLayerMaskLumaSamplesBelowNotLayer(t *testing.T) {
+	base := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	for y := 0; y < 64; y++ {
+		for x := 0; x < 64; x++ {
+			o := base.PixOffset(x, y)
+			if x < 32 {
+				base.Pix[o], base.Pix[o+1], base.Pix[o+2], base.Pix[o+3] = 10, 10, 10, 255 // dark half
+			} else {
+				base.Pix[o], base.Pix[o+1], base.Pix[o+2], base.Pix[o+3] = 250, 250, 250, 255 // bright half
+			}
+		}
+	}
+	overlay := solid(64, 64, 0, 255, 0, 255) // flat colour: no luminance variation of its own
+	spec := Spec{
+		Layers: []Layer{
+			{Enabled: true, Source: SourceBase, Blend: BlendNormal, Opacity: 1},
+			{
+				Enabled: true, Source: SourceImage, ImageIndex: 0, Blend: BlendNormal, Opacity: 1,
+				Mask: &mask.Mask{Kind: mask.KindLuma, Threshold: 0.5},
+			},
+		},
+	}
+	out, err := Evaluate(spec, base, []*image.RGBA{overlay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// If luma were sampled from the (flat) overlay instead of the base, both
+	// sides would come out identical. They don't: the dark half of the BASE
+	// hides the layer, the bright half reveals it.
+	if r, g, b, a := at(out, 5, 32); r != 10 || g != 10 || b != 10 || a != 255 {
+		t.Fatalf("dark-below side = %d,%d,%d,%d, want base 10,10,10,255 (layer hidden)", r, g, b, a)
+	}
+	if r, g, b, a := at(out, 50, 32); r != 0 || g != 255 || b != 0 || a != 255 {
+		t.Fatalf("bright-below side = %d,%d,%d,%d, want overlay 0,255,0,255 (layer revealed)", r, g, b, a)
+	}
+}
+
+func TestEvaluateLayerMaskIsDeterministic(t *testing.T) {
+	base := solid(16, 16, 50, 50, 50, 255)
+	overlay := solid(16, 16, 220, 220, 220, 255)
+	makeSpec := func(m *mask.Mask) Spec {
+		return Spec{
+			Layers: []Layer{
+				{Enabled: true, Source: SourceBase, Blend: BlendNormal, Opacity: 1},
+				{Enabled: true, Source: SourceImage, ImageIndex: 0, Blend: BlendNormal, Opacity: 1, Mask: m},
+			},
+		}
+	}
+
+	plain, err := Evaluate(makeSpec(nil), base, []*image.RGBA{overlay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	masked, err := Evaluate(makeSpec(&mask.Mask{Kind: mask.KindRect, X: 0.25, Y: 0.25, W: 0.5, H: 0.5}), base, []*image.RGBA{overlay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(plain.Pix, masked.Pix) {
+		t.Fatal("a layer Mask had no effect on Evaluate's output")
+	}
+
+	masked2, err := Evaluate(makeSpec(&mask.Mask{Kind: mask.KindRect, X: 0.25, Y: 0.25, W: 0.5, H: 0.5}), base, []*image.RGBA{overlay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(masked.Pix, masked2.Pix) {
+		t.Fatal("Evaluate with a layer Mask is not deterministic: two runs differ")
 	}
 }

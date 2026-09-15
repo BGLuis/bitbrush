@@ -2,7 +2,7 @@
 // so a result — including noisefield seed, colors and spots — is reproducible from a shared link,
 // with no server involved. Only the recipe travels in the URL, never image data.
 
-import type { FilterParams } from "./wasm";
+import type { FilterParams, MaskParams } from "./wasm";
 
 const EFFECT_KEY = "fx";
 const PARAM_PREFIX = "p.";
@@ -36,6 +36,7 @@ export interface ComposeLayerRecipe {
   opacity?: number;
   fit?: string;
   transform?: [number, number, number, number]; // [offsetX, offsetY, scale, rotation]
+  mask?: MaskParams;
   genParams?: Record<string, any>;
   chain?: Array<{ filter: string; params: Record<string, any>; mask?: any }>;
 }
@@ -73,6 +74,7 @@ export function readStateFromURL(): URLState {
             Array.isArray(e.t) && e.t.length === 4
               ? (e.t as [number, number, number, number])
               : undefined,
+          mask: e.m && typeof e.m === "object" ? (e.m as MaskParams) : undefined,
           genParams: e.p && typeof e.p === "object" ? e.p : undefined,
           chain: Array.isArray(e.c)
             ? e.c.map((c: any) => ({
@@ -306,6 +308,7 @@ export function writeComposeStateToURL(state: ComposeURLState, immediate = false
     if (L.transform && !(L.transform[0] === 0 && L.transform[1] === 0 && L.transform[2] === 1 && L.transform[3] === 0)) {
       e.t = L.transform;
     }
+    if (L.mask) e.m = L.mask;
     if (L.genParams && Object.keys(L.genParams).length) e.p = L.genParams;
     if (L.chain && L.chain.length) {
       e.c = L.chain.map((c) => (c.mask ? [c.filter, c.params, c.mask] : [c.filter, c.params]));
