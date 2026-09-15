@@ -12,7 +12,15 @@ const (
 	KindRect    Kind = "rect"
 	KindEllipse Kind = "ellipse"
 	KindLuma    Kind = "luma"
+	KindPolygon Kind = "polygon"
 )
+
+// Point is one KindPolygon vertex, in normalized [0, 1] canvas coordinates
+// (same convention as Mask.X/Y).
+type Point struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
 
 // Mask describes a region of interest in normalized coordinates [0, 1]
 // or luminance threshold, used to restrict filter application.
@@ -25,6 +33,12 @@ type Mask struct {
 	Feather   float64 `json:"feather,omitempty"`   // [0, 1] Edge transition softness
 	Threshold float64 `json:"threshold,omitempty"` // [0, 1] Luminance threshold for luma
 	Invert    bool    `json:"invert,omitempty"`    // Invert mask selection
+	// Points is the KindPolygon vertex list, normalized [0, 1]. Fewer than 3
+	// points is treated as an empty selection (Alpha returns 0, before
+	// Invert). Self-intersecting polygons are not special-cased: the
+	// even-odd ray-casting rule below handles them the standard way (a
+	// bowtie shape's "waist" ends up outside the selection).
+	Points []Point `json:"points,omitempty"`
 }
 
 // Alpha computes the blending weight [0.0..1.0] for pixel (px, py)
@@ -106,6 +120,52 @@ func (m *Mask) Alpha(px, py, w, h int, origR, origG, origB uint8) float64 {
 			}
 		}
 
+	case KindPolygon:
+		n := len(m.Points)
+		if n < 3 {
+			alpha = 0.0
+			break
+		}
+
+		inside := false
+		minDist := math.MaxFloat64
+		for i, j := 0, n-1; i < n; j, i = i, i+1 {
+			xi, yi := m.Points[i].X*fw, m.Points[i].Y*fh
+			xj, yj := m.Points[j].X*fw, m.Points[j].Y*fh
+
+			// Even-odd ray-casting rule: count edges crossing the
+			// horizontal ray to the right of (px, py).
+			if (yi > float64(py)) != (yj > float64(py)) {
+				xCross := (xj-xi)*(float64(py)-yi)/(yj-yi) + xi
+				if float64(px) < xCross {
+					inside = !inside
+				}
+			}
+			if d := pointSegDist(float64(px), float64(py), xi, yi, xj, yj); d < minDist {
+				minDist = d
+			}
+		}
+
+		d := minDist
+		if !inside {
+			d = -minDist
+		}
+		featherPx := m.Feather * math.Min(fw, fh) * 0.5
+
+		if featherPx <= 0 {
+			if d >= 0 {
+				alpha = 1.0
+			} else {
+				alpha = 0.0
+			}
+		} else if d <= 0 {
+			alpha = 0.0
+		} else if d < featherPx {
+			alpha = d / featherPx
+		} else {
+			alpha = 1.0
+		}
+
 	case KindLuma:
 		lum := (0.2126*float64(origR) + 0.7152*float64(origG) + 0.0722*float64(origB)) / 255.0
 		threshold := m.Threshold
@@ -142,6 +202,23 @@ func (m *Mask) Alpha(px, py, w, h int, origR, origG, origB uint8) float64 {
 		return 1
 	}
 	return alpha
+}
+
+// pointSegDist returns the shortest distance from (px, py) to the segment
+// a-b, via a clamped projection onto the segment.
+func pointSegDist(px, py, ax, ay, bx, by float64) float64 {
+	dx, dy := bx-ax, by-ay
+	lenSq := dx*dx + dy*dy
+	if lenSq == 0 {
+		return math.Hypot(px-ax, py-ay)
+	}
+	t := ((px-ax)*dx + (py-ay)*dy) / lenSq
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+	return math.Hypot(px-(ax+t*dx), py-(ay+t*dy))
 }
 
 // Compose blends original and filtered images according to mask m.

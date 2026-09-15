@@ -6,6 +6,8 @@
   import { generatorStore } from "./generator/generator-store.svelte";
   import { composeStore } from "./compose/compose-store.svelte";
   import CanvasSpotsOverlay from "./generator/CanvasSpotsOverlay.svelte";
+  import SelectionOverlay from "./compose/SelectionOverlay.svelte";
+  import { selectionStore } from "./compose/selection-store.svelte";
   import { viewState, zoomFit, zoomActual, nudgeZoom } from "./lib/view.svelte";
 
   let canvasEl: HTMLCanvasElement;
@@ -132,6 +134,9 @@
       <canvas bind:this={canvasEl}></canvas>
       {#if ui.mode === "generator" && generatorStore.generatorMode === "noise" && generatorStore.isOrganic}
         <CanvasSpotsOverlay />
+      {/if}
+      {#if ui.mode === "compose" && selectionStore.active}
+        <SelectionOverlay />
       {/if}
     </div>
     {#if showEmpty}

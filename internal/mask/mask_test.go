@@ -109,6 +109,76 @@ func TestComposeLuma(t *testing.T) {
 	}
 }
 
+func TestComposePolygonTriangle(t *testing.T) {
+	orig := solidRGBA(100, 100, color.RGBA{R: 0, G: 0, B: 0, A: 255})
+	filt := solidRGBA(100, 100, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+
+	m := &Mask{Kind: KindPolygon, Points: []Point{
+		{X: 0.5, Y: 0.1}, {X: 0.9, Y: 0.9}, {X: 0.1, Y: 0.9},
+	}}
+
+	out := Compose(orig, filt, m)
+
+	// Deep inside the triangle
+	if idx := out.PixOffset(50, 60); out.Pix[idx] != 255 {
+		t.Errorf("inside triangle R=%d, want 255", out.Pix[idx])
+	}
+	// Above the apex, outside
+	if idx := out.PixOffset(5, 5); out.Pix[idx] != 0 {
+		t.Errorf("outside triangle R=%d, want 0", out.Pix[idx])
+	}
+}
+
+func TestComposePolygonFeather(t *testing.T) {
+	orig := solidRGBA(100, 100, color.RGBA{R: 10, G: 10, B: 10, A: 255})
+	filt := solidRGBA(100, 100, color.RGBA{R: 200, G: 200, B: 200, A: 255})
+
+	m := &Mask{
+		Kind:    KindPolygon,
+		Points:  []Point{{X: 0.2, Y: 0.2}, {X: 0.8, Y: 0.2}, {X: 0.8, Y: 0.8}, {X: 0.2, Y: 0.8}},
+		Feather: 0.2, // featherPx = 0.2 * 100 * 0.5 = 10
+	}
+
+	out := Compose(orig, filt, m)
+
+	// (25, 50): 5px inside the left edge (x=20) -> d=5, alpha=0.5 -> strictly between
+	r := out.Pix[out.PixOffset(25, 50)]
+	if r <= 10 || r >= 200 {
+		t.Errorf("feathered edge R=%d, want strictly between 10 and 200", r)
+	}
+}
+
+func TestComposePolygonDegenerateNoPanic(t *testing.T) {
+	orig := solidRGBA(10, 10, color.RGBA{R: 1, G: 2, B: 3, A: 255})
+	filt := solidRGBA(10, 10, color.RGBA{R: 4, G: 5, B: 6, A: 255})
+
+	m := &Mask{Kind: KindPolygon, Points: []Point{{X: 0.2, Y: 0.2}, {X: 0.8, Y: 0.8}}} // only 2 points
+
+	out := Compose(orig, filt, m) // must not panic
+	if idx := out.PixOffset(5, 5); out.Pix[idx] != 1 {
+		t.Errorf("degenerate polygon R=%d, want original 1 (alpha 0)", out.Pix[idx])
+	}
+}
+
+func TestComposePolygonInvert(t *testing.T) {
+	orig := solidRGBA(100, 100, color.RGBA{R: 0, G: 0, B: 0, A: 255})
+	filt := solidRGBA(100, 100, color.RGBA{R: 255, G: 255, B: 255, A: 255})
+
+	m := &Mask{
+		Kind:   KindPolygon,
+		Points: []Point{{X: 0.5, Y: 0.1}, {X: 0.9, Y: 0.9}, {X: 0.1, Y: 0.9}},
+		Invert: true,
+	}
+
+	out := Compose(orig, filt, m)
+	if idx := out.PixOffset(50, 60); out.Pix[idx] != 0 {
+		t.Errorf("inverted inside R=%d, want 0", out.Pix[idx])
+	}
+	if idx := out.PixOffset(5, 5); out.Pix[idx] != 255 {
+		t.Errorf("inverted outside R=%d, want 255", out.Pix[idx])
+	}
+}
+
 func TestComposeNil(t *testing.T) {
 	orig := solidRGBA(10, 10, color.RGBA{R: 1, G: 2, B: 3, A: 255})
 	filt := solidRGBA(10, 10, color.RGBA{R: 4, G: 5, B: 6, A: 255})

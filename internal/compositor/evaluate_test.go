@@ -347,6 +347,32 @@ func TestEvaluateLayerMaskRevealsBelowOutsideRegion(t *testing.T) {
 	}
 }
 
+func TestEvaluateLayerMaskPolygonMatchesRectSquare(t *testing.T) {
+	base := solid(64, 64, 100, 100, 100, 255)
+	overlay := solid(64, 64, 200, 50, 50, 255)
+	spec := Spec{
+		Layers: []Layer{
+			{Enabled: true, Source: SourceBase, Blend: BlendNormal, Opacity: 1},
+			{
+				Enabled: true, Source: SourceImage, ImageIndex: 0, Blend: BlendNormal, Opacity: 1,
+				Mask: &mask.Mask{Kind: mask.KindPolygon, Points: []mask.Point{
+					{X: 0.25, Y: 0.25}, {X: 0.75, Y: 0.25}, {X: 0.75, Y: 0.75}, {X: 0.25, Y: 0.75},
+				}},
+			},
+		},
+	}
+	out, err := Evaluate(spec, base, []*image.RGBA{overlay})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r, g, b, a := at(out, 5, 5); r != 100 || g != 100 || b != 100 || a != 255 {
+		t.Fatalf("outside polygon mask = %d,%d,%d,%d, want base untouched", r, g, b, a)
+	}
+	if r, g, b, a := at(out, 32, 32); r != 200 || g != 50 || b != 50 || a != 255 {
+		t.Fatalf("inside polygon mask = %d,%d,%d,%d, want overlay", r, g, b, a)
+	}
+}
+
 func TestEvaluateLayerMaskFeatherBlendsAtEdge(t *testing.T) {
 	base := solid(64, 64, 100, 100, 100, 255)
 	overlay := solid(64, 64, 200, 50, 50, 255)

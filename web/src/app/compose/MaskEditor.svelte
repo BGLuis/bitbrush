@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { MaskParams } from "../../wasm";
+  import { selectionStore, type SelectionTool } from "./selection-store.svelte";
 
   let {
     mask,
@@ -11,6 +12,9 @@
     title?: string;
   } = $props();
 
+  let myToken = $state<number | null>(null);
+  const isArming = $derived(selectionStore.active && selectionStore.token === myToken);
+
   function onKindChange(kind: string) {
     if (kind === "none" || !kind) {
       onchange(undefined);
@@ -18,7 +22,19 @@
       onchange({ kind, x: 0.2, y: 0.2, w: 0.6, h: 0.6, feather: 0.1, invert: false });
     } else if (kind === "luma") {
       onchange({ kind: "luma", threshold: 0.5, feather: 0.05, invert: false });
+    } else if (kind === "polygon") {
+      onchange({ kind: "polygon", points: [], feather: 0, invert: false });
+      draw("polygon"); // an empty polygon hides the layer/stage entirely — jump straight into drawing
     }
+  }
+
+  function draw(tool: SelectionTool) {
+    myToken = selectionStore.arm(tool, onchange);
+  }
+
+  function cancelDraw() {
+    selectionStore.cancel();
+    myToken = null;
   }
 
   function patch(field: keyof MaskParams, value: number | boolean) {
@@ -35,10 +51,22 @@
       <option value="rect">Retângulo</option>
       <option value="ellipse">Elipse</option>
       <option value="luma">Luminância</option>
+      <option value="polygon">Polígono (laço)</option>
     </select>
   </div>
 
   {#if mask}
+    {#if mask.kind !== "luma"}
+      <div class="mask-draw">
+        {#if isArming}
+          <span class="drawing">Desenhando no canvas…</span>
+          <button type="button" onclick={cancelDraw}>Cancelar</button>
+        {:else}
+          <button type="button" onclick={() => draw(mask.kind as SelectionTool)}>Desenhar no canvas</button>
+        {/if}
+      </div>
+    {/if}
+
     <div class="mask-controls">
       {#if mask.kind === "rect" || mask.kind === "ellipse"}
         <label class="mask-row">
@@ -119,6 +147,29 @@
             oninput={(e) => patch("feather", Number(e.currentTarget.value))}
           />
         </label>
+      {:else if mask.kind === "polygon"}
+        <p class="hint">
+          {mask.points?.length ? `${mask.points.length} pontos` : "Nenhum ponto — desenhe no canvas"}
+        </p>
+        <button
+          type="button"
+          class="clear-pts"
+          disabled={!mask.points?.length}
+          onclick={() => onchange({ ...mask, points: [] })}
+        >
+          Limpar pontos
+        </button>
+        <label class="mask-row">
+          <span>Suavização · {Math.round((mask.feather ?? 0) * 100)}%</span>
+          <input
+            type="range"
+            min="0"
+            max="0.5"
+            step="0.01"
+            value={mask.feather ?? 0}
+            oninput={(e) => patch("feather", Number(e.currentTarget.value))}
+          />
+        </label>
       {/if}
 
       <label class="mask-check">
@@ -157,6 +208,47 @@
     font-size: 11px;
     padding: 2px 4px;
     max-width: 140px;
+  }
+  .mask-draw {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+  .mask-draw button {
+    border: 1px solid var(--line);
+    background: var(--s2);
+    color: var(--text);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .mask-draw button:hover {
+    border-color: var(--accent);
+  }
+  .drawing {
+    color: var(--accent);
+    font-weight: 500;
+  }
+  .hint {
+    margin: 0;
+    font-size: 11px;
+    color: var(--mute);
+  }
+  .clear-pts {
+    align-self: flex-start;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--dim);
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .clear-pts:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
   .mask-controls {
     display: flex;

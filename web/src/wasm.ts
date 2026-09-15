@@ -327,7 +327,7 @@ export type LayerSource = "base" | "image" | "generator" | "gradient" | "noisefi
 export type FitMode = "cover" | "contain" | "stretch" | "center" | "tile";
 
 export interface MaskParams {
-  kind: "rect" | "ellipse" | "luma";
+  kind: "rect" | "ellipse" | "luma" | "polygon";
   x?: number; // [0, 1]
   y?: number; // [0, 1]
   w?: number; // [0, 1]
@@ -335,6 +335,7 @@ export interface MaskParams {
   feather?: number; // [0, 1]
   threshold?: number; // [0, 1] (luma)
   invert?: boolean;
+  points?: Array<{ x: number; y: number }>; // [0, 1] normalized — kind "polygon" only
 }
 
 export interface TextParams {
