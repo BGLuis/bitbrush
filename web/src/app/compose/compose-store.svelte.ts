@@ -17,7 +17,15 @@ import { downloadCanvas } from "../lib/download";
 import { showToast } from "../lib/toast.svelte";
 import { generators } from "../../ui/generators";
 import type { Control } from "../../ui/controls";
-import type { BlendMode, ComposeLayer, ComposeSpec, FitMode, LayerSource, MaskParams } from "../../wasm";
+import type {
+  BlendMode,
+  ComposeLayer,
+  ComposeSpec,
+  ComposeTransform,
+  FitMode,
+  LayerSource,
+  MaskParams,
+} from "../../wasm";
 
 export const BLEND_MODES: BlendMode[] = [
   "normal",
@@ -69,6 +77,7 @@ export interface LayerUI {
   generator: string; // source === "generator"
   genParams: Record<string, any>; // generator / gradient / noisefield params
   fit: FitMode;
+  transform: ComposeTransform;
   chain: ChainStage[];
   blend: BlendMode;
   opacity: number; // 0..1
@@ -77,6 +86,10 @@ export interface LayerUI {
 let idc = 0;
 const uid = (p: string) => `${p}${(idc++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+function identityTransform(): ComposeTransform {
+  return { offsetX: 0, offsetY: 0, scale: 1, rotation: 0 };
+}
 
 export function generatorControls(name: string): Control[] {
   return generators.find((g) => g.name === name)?.controls ?? [];
@@ -137,6 +150,7 @@ function newLayer(source: LayerSource): LayerUI {
     generator: "truchet",
     genParams: {},
     fit: "cover",
+    transform: identityTransform(),
     chain: [],
     blend: "normal",
     opacity: 1,
@@ -167,12 +181,113 @@ function newLayer(source: LayerSource): LayerUI {
   return L;
 }
 
+interface ComposeSnapshot {
+  layers: LayerUI[];
+  selected: number;
+  ratio: string;
+}
+
+// How long a burst of continuous edits (dragging a slider, holding an
+// arrow key) is allowed to run before it settles into its own undo step.
+// Longer than render.ts's 50ms render debounce on purpose.
+const HISTORY_BURST_MS = 800;
+const HISTORY_LIMIT = 50;
+
 class ComposeStore {
   layers = $state<LayerUI[]>([newLayer("base")]);
   selected = $state(0);
   slots = $state<ImageSlot[]>([]);
   ratio = $state("16/9");
   status = $state("");
+
+  // --- undo / redo ---
+  // Plain arrays, not $state: nothing renders their contents, only whether
+  // they're empty (exposed via the tick counters below).
+  #history: ComposeSnapshot[] = [];
+  #future: ComposeSnapshot[] = [];
+  #baseline: ComposeSnapshot | undefined;
+  #baselineKey: string | undefined;
+  #burstTimer: ReturnType<typeof setTimeout> | undefined;
+  #restoring = false;
+  #historyTick = $state(0);
+  #futureTick = $state(0);
+
+  get canUndo(): boolean {
+    void this.#historyTick;
+    return this.#history.length > 0;
+  }
+  get canRedo(): boolean {
+    void this.#futureTick;
+    return this.#future.length > 0;
+  }
+
+  #snapshot(): ComposeSnapshot {
+    return {
+      layers: $state.snapshot(this.layers) as LayerUI[],
+      selected: this.selected,
+      ratio: this.ratio,
+    };
+  }
+
+  // Called as the first thing scheduleRender() does, so it sees every edit
+  // path — named mutators AND the ad-hoc in-place mutations ParamForm /
+  // ChainEditor / LayerEditor's gradient+noise fields make before calling
+  // scheduleRender() themselves.
+  #noteEdit(): void {
+    if (this.#restoring) return;
+    const snap = this.#snapshot();
+    const key = JSON.stringify(snap);
+    if (this.#baseline === undefined) {
+      // First call ever (post-hydration): seed the baseline, no history yet.
+      this.#baseline = snap;
+      this.#baselineKey = key;
+      return;
+    }
+    if (key === this.#baselineKey) return; // a repaint with no real change
+    if (this.#burstTimer === undefined) {
+      this.#history.push(this.#baseline);
+      if (this.#history.length > HISTORY_LIMIT) this.#history.shift();
+      this.#historyTick++;
+      this.#future = [];
+      this.#futureTick++;
+    } else {
+      clearTimeout(this.#burstTimer);
+    }
+    this.#burstTimer = setTimeout(() => {
+      this.#burstTimer = undefined;
+      this.#baseline = this.#snapshot();
+      this.#baselineKey = JSON.stringify(this.#baseline);
+    }, HISTORY_BURST_MS);
+  }
+
+  #applySnapshot(s: ComposeSnapshot): void {
+    this.#restoring = true;
+    this.layers = s.layers;
+    this.selected = s.selected;
+    this.ratio = s.ratio;
+    this.#restoring = false;
+    this.#baseline = this.#snapshot();
+    this.#baselineKey = JSON.stringify(this.#baseline);
+    this.scheduleRender();
+  }
+
+  undo(): void {
+    if (!this.canUndo) return;
+    this.#future.push(this.#snapshot());
+    this.#futureTick++;
+    const prev = this.#history.pop()!;
+    this.#historyTick++;
+    this.#applySnapshot(prev);
+  }
+
+  redo(): void {
+    if (!this.canRedo) return;
+    this.#history.push(this.#snapshot());
+    this.#historyTick++;
+    const next = this.#future.pop()!;
+    this.#futureTick++;
+    this.#applySnapshot(next);
+  }
 
   get aspectRatio(): number {
     const [w, h] = this.ratio.split("/").map(Number);
@@ -244,6 +359,19 @@ class ComposeStore {
     this.layers[i].fit = f;
     this.scheduleRender();
   }
+  setTransform(i: number, patch: Partial<ComposeTransform>): void {
+    const L = this.layers[i];
+    Object.assign(L.transform, patch);
+    // A "cover" fit has already cropped away part of the source before any
+    // transform runs — avoid surprising the user by switching to "contain"
+    // the first time they nudge position/scale/rotation.
+    if (L.fit === "cover") L.fit = "contain";
+    this.scheduleRender();
+  }
+  resetTransform(i: number): void {
+    this.layers[i].transform = identityTransform();
+    this.scheduleRender();
+  }
   setRatio(r: string): void {
     this.ratio = r;
     this.scheduleRender();
@@ -258,6 +386,7 @@ class ComposeStore {
     fresh.blend = cur.blend;
     fresh.opacity = cur.opacity;
     fresh.fit = cur.fit;
+    fresh.transform = cur.transform;
     fresh.chain = cur.chain;
     this.layers[i] = fresh;
     this.scheduleRender();
@@ -266,10 +395,6 @@ class ComposeStore {
   setGenerator(i: number, name: string): void {
     this.layers[i].generator = name;
     this.layers[i].genParams = defaultGeneratorParams(name);
-    this.scheduleRender();
-  }
-  setGenParam(i: number, key: string, val: unknown): void {
-    this.layers[i].genParams[key] = val;
     this.scheduleRender();
   }
 
@@ -362,6 +487,7 @@ class ComposeStore {
         enabled: L.enabled,
         source: L.source,
         fit: L.fit,
+        transform: L.transform,
         blend: L.blend,
         opacity: L.opacity,
         chain: L.chain.map((s) => ({ filter: s.filter, params: s.params, mask: s.mask })),
@@ -403,6 +529,7 @@ class ComposeStore {
   }
 
   scheduleRender(): void {
+    this.#noteEdit();
     this.updateURL();
     const canvas = refs.canvas;
     if (!canvas) return;
@@ -460,6 +587,7 @@ class ComposeStore {
           blend: L.blend,
           opacity: L.opacity,
           fit: L.fit,
+          transform: [L.transform.offsetX, L.transform.offsetY, L.transform.scale, L.transform.rotation],
           genParams:
             L.source === "generator" || L.source === "gradient" || L.source === "noisefield" || L.source === "text"
               ? L.genParams
@@ -504,6 +632,10 @@ class ComposeStore {
       if (r.blend) L.blend = r.blend as BlendMode;
       if (typeof r.opacity === "number") L.opacity = r.opacity;
       if (r.fit) L.fit = r.fit as FitMode;
+      if (r.transform) {
+        const [offsetX, offsetY, scale, rotation] = r.transform;
+        L.transform = { offsetX, offsetY, scale, rotation };
+      }
       L.chain = (r.chain ?? []).map((s) => ({
         id: uid("S"),
         filter: s.filter,

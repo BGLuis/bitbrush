@@ -162,6 +162,39 @@ func TestEvaluateImageLayer(t *testing.T) {
 	}
 }
 
+func TestEvaluateLayerWithTransformMovesContent(t *testing.T) {
+	base := solid(8, 8, 200, 60, 60, 255)
+	extra := solid(8, 8, 255, 255, 255, 255)
+	makeSpec := func(tr *Transform) Spec {
+		return Spec{
+			Layers: []Layer{
+				{Enabled: true, Source: SourceBase, Blend: BlendNormal, Opacity: 1},
+				{Enabled: true, Source: SourceImage, ImageIndex: 0, Blend: BlendNormal, Opacity: 1, Transform: tr},
+			},
+		}
+	}
+
+	plain, err := Evaluate(makeSpec(nil), base, []*image.RGBA{extra})
+	if err != nil {
+		t.Fatal(err)
+	}
+	moved, err := Evaluate(makeSpec(&Transform{OffsetX: 0.4}), base, []*image.RGBA{extra})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(plain.Pix, moved.Pix) {
+		t.Fatal("a non-identity Transform on a layer had no effect on Evaluate's output")
+	}
+
+	moved2, err := Evaluate(makeSpec(&Transform{OffsetX: 0.4}), base, []*image.RGBA{extra})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(moved.Pix, moved2.Pix) {
+		t.Fatal("Evaluate with a Transform is not deterministic: two runs differ")
+	}
+}
+
 func TestEvaluateErrors(t *testing.T) {
 	base := solid(8, 8, 0, 0, 0, 255)
 	tests := []struct {
@@ -285,4 +318,3 @@ func TestEvaluateStageWithMask(t *testing.T) {
 		t.Errorf("outside mask R=%d, want original 100", out.Pix[idxOutside])
 	}
 }
-

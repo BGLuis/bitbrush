@@ -35,6 +35,7 @@ export interface ComposeLayerRecipe {
   blend?: string;
   opacity?: number;
   fit?: string;
+  transform?: [number, number, number, number]; // [offsetX, offsetY, scale, rotation]
   genParams?: Record<string, any>;
   chain?: Array<{ filter: string; params: Record<string, any>; mask?: any }>;
 }
@@ -68,6 +69,10 @@ export function readStateFromURL(): URLState {
           blend: typeof e.b === "string" ? e.b : undefined,
           opacity: typeof e.o === "number" ? e.o : undefined,
           fit: typeof e.f === "string" ? e.f : undefined,
+          transform:
+            Array.isArray(e.t) && e.t.length === 4
+              ? (e.t as [number, number, number, number])
+              : undefined,
           genParams: e.p && typeof e.p === "object" ? e.p : undefined,
           chain: Array.isArray(e.c)
             ? e.c.map((c: any) => ({
@@ -298,6 +303,9 @@ export function writeComposeStateToURL(state: ComposeURLState, immediate = false
     if (typeof L.opacity === "number" && L.opacity !== 1) e.o = Number(L.opacity.toFixed(3));
     if (L.enabled === false) e.e = 0;
     if (L.fit && L.fit !== "cover") e.f = L.fit;
+    if (L.transform && !(L.transform[0] === 0 && L.transform[1] === 0 && L.transform[2] === 1 && L.transform[3] === 0)) {
+      e.t = L.transform;
+    }
     if (L.genParams && Object.keys(L.genParams).length) e.p = L.genParams;
     if (L.chain && L.chain.length) {
       e.c = L.chain.map((c) => (c.mask ? [c.filter, c.params, c.mask] : [c.filter, c.params]));

@@ -44,6 +44,7 @@ type Layer struct {
 	Generator  string          `json:"generator,omitempty"`  // Source == "generator"
 	GenParams  json.RawMessage `json:"genParams,omitempty"`  // generator / gradient / noisefield params
 	Fit        FitMode         `json:"fit,omitempty"`        // default cover
+	Transform  *Transform      `json:"transform,omitempty"`  // move/scale/rotate after Fit
 	Chain      []Stage         `json:"chain,omitempty"`
 	Blend      BlendMode       `json:"blend"`
 	Opacity    float64         `json:"opacity"` // 0..1
@@ -92,6 +93,9 @@ func Evaluate(spec Spec, base *image.RGBA, extras []*image.RGBA) (*image.RGBA, e
 		}
 		if b := src.Bounds(); b.Dx() != w || b.Dy() != h {
 			src = Fit(src, w, h, layer.Fit)
+		}
+		if layer.Transform != nil && !layer.Transform.IsIdentity() {
+			src = ApplyTransform(src, *layer.Transform, w, h)
 		}
 
 		cur := src

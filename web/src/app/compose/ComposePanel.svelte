@@ -17,6 +17,15 @@
 </script>
 
 <div class="compose">
+  <div class="hist">
+    <button type="button" disabled={!composeStore.canUndo} onclick={() => composeStore.undo()}>
+      ↶ Desfazer
+    </button>
+    <button type="button" disabled={!composeStore.canRedo} onclick={() => composeStore.redo()}>
+      ↷ Refazer
+    </button>
+  </div>
+
   <LayerList />
 
   <div class="add">
@@ -51,6 +60,29 @@
     display: flex;
     flex-direction: column;
     gap: 14px;
+  }
+  .hist {
+    display: flex;
+    gap: 6px;
+  }
+  .hist button {
+    flex: 1;
+    border: 1px solid var(--line);
+    background: var(--s2);
+    color: var(--text);
+    padding: 7px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .hist button:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: var(--tint);
+  }
+  .hist button:disabled {
+    color: var(--mute);
+    cursor: default;
+    opacity: 0.6;
   }
   .cap {
     font-size: 10.5px;

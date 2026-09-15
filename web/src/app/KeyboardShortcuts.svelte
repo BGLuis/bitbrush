@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { ui, resetParams } from "./store.svelte";
   import { generatorStore } from "./generator/generator-store.svelte";
+  import { composeStore } from "./compose/compose-store.svelte";
   import {
     openImage,
     exportPNG,
@@ -33,6 +34,8 @@
         { keys: ["Alt", "↑"], label: "Filtro anterior" },
         { keys: ["Alt", "↓"], label: "Próximo filtro" },
         { keys: ["Espaço"], label: "Animar / pausar (geradores)" },
+        { keys: [MOD, "Z"], label: "Desfazer (Compor)" },
+        { keys: [MOD, "⇧", "Z"], label: "Refazer (Compor)" },
       ],
     },
     {
@@ -107,6 +110,24 @@
     if (mod && e.shiftKey && (e.key === "c" || e.key === "C")) {
       e.preventDefault();
       copyShareLink((m) => m && showToast(m));
+      return;
+    }
+    if (mod && !e.altKey && !typing && ui.mode === "compose" && (e.key === "z" || e.key === "Z")) {
+      e.preventDefault();
+      if (e.shiftKey) composeStore.redo();
+      else composeStore.undo();
+      return;
+    }
+    if (
+      mod &&
+      !e.altKey &&
+      !typing &&
+      ui.mode === "compose" &&
+      !IS_MAC &&
+      (e.key === "y" || e.key === "Y")
+    ) {
+      e.preventDefault();
+      composeStore.redo();
       return;
     }
     if (e.altKey && !mod && (e.key === "r" || e.key === "R")) {

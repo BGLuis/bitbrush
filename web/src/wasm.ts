@@ -348,6 +348,16 @@ export interface TextParams {
   opacity?: number;
 }
 
+/** Move/scale/rotate a layer's already-fitted content within the canvas,
+ *  applied after `fit`. Offsets are a fraction of canvas width/height (0 =
+ *  centred); rotation is in degrees, positive = clockwise. */
+export interface ComposeTransform {
+  offsetX: number;
+  offsetY: number;
+  scale: number; // default 1
+  rotation: number; // default 0, degrees
+}
+
 /** One entry in a layer's own ordered filter chain. */
 export interface ComposeStage {
   filter: string;
@@ -362,6 +372,7 @@ export interface ComposeLayer {
   generator?: string; // source === "generator"
   genParams?: Record<string, unknown>; // generator / gradient / noisefield / text params
   fit?: FitMode; // default "cover"
+  transform?: ComposeTransform;
   chain: ComposeStage[];
   blend: BlendMode;
   opacity: number; // 0..1

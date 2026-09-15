@@ -97,6 +97,59 @@
         {/each}
       </select>
     </label>
+
+    <div class="mini transform">
+      <div class="transform-hd">
+        <span>Transform</span>
+        <button type="button" class="reset" onclick={() => composeStore.resetTransform(index)}>
+          Redefinir
+        </button>
+      </div>
+      <label class="fld">
+        <span>Posição X · {layer.transform.offsetX.toFixed(2)}</span>
+        <input
+          type="range"
+          min="-0.5"
+          max="0.5"
+          step="0.01"
+          value={layer.transform.offsetX}
+          oninput={(e) => composeStore.setTransform(index, { offsetX: Number(e.currentTarget.value) })}
+        />
+      </label>
+      <label class="fld">
+        <span>Posição Y · {layer.transform.offsetY.toFixed(2)}</span>
+        <input
+          type="range"
+          min="-0.5"
+          max="0.5"
+          step="0.01"
+          value={layer.transform.offsetY}
+          oninput={(e) => composeStore.setTransform(index, { offsetY: Number(e.currentTarget.value) })}
+        />
+      </label>
+      <label class="fld">
+        <span>Escala · {layer.transform.scale.toFixed(2)}×</span>
+        <input
+          type="range"
+          min="0.1"
+          max="3"
+          step="0.01"
+          value={layer.transform.scale}
+          oninput={(e) => composeStore.setTransform(index, { scale: Number(e.currentTarget.value) })}
+        />
+      </label>
+      <label class="fld">
+        <span>Rotação · {Math.round(layer.transform.rotation)}°</span>
+        <input
+          type="range"
+          min="0"
+          max="360"
+          step="1"
+          value={layer.transform.rotation}
+          oninput={(e) => composeStore.setTransform(index, { rotation: Number(e.currentTarget.value) })}
+        />
+      </label>
+    </div>
   {/if}
 
   {#if layer.source === "image"}
@@ -429,6 +482,27 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 9px;
+  }
+  .transform-hd {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--dim);
+  }
+  .reset {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--dim);
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .reset:hover {
+    border-color: var(--accent);
+    color: var(--text);
   }
   .imgpick {
     display: flex;
